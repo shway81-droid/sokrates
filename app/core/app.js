@@ -148,7 +148,7 @@
           el("label", { class: "field" }, [el("span", { text: "주제" }), topicSel]),
           el("label", { class: "field" }, [el("span", { text: "우리 반 교과서" }), tbSel,
             el("div", { class: "hint", text: "반례 질문은 고른 교과서 내용에서만 나와요." })]),
-          n > 0 && el("div", { class: "note", text: `검토하지 않은 오개념이 ${n}개 있어요. data/topic-625.js 에서 확인한 뒤 reviewed 를 true 로 바꿔 주세요.` }),
+          n > 0 && el("div", { class: "note", text: `검토하지 않은 오개념이 ${n}개 있어요. review.html 에서 확인해 주세요.` }),
           el("div", { class: "row end" }, [el("button", { class: "btn", type: "button", text: "시작하기", onclick: () => newStudent() })]),
         ]),
       ]);
