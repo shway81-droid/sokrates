@@ -155,3 +155,30 @@ test("check schema asks for the misconception id", () => {
   assert.ok(E.SCHEMAS.check.required.includes("misconception"));
   assert.ok(E.SYSTEM_PROMPT.includes("misconception"));
 });
+
+// ---- 차시 범위 (주제 확장) ----
+const unit = require("./fixtures/unit-mini.js");
+const T = load("core/topic.js");
+const merged = () => T.mergeTopics(structuredClone(unit), "작은 단원");
+const makeL = (responses, lessonId) => { const fake = fakeLLM(responses); return { fake, s: E.createSession({ topic: merged(), textbookId: "a", lessonId, llm: fake }) }; };
+
+test("prompt is not tied to 6·25", () => {
+  assert.ok(!E.SYSTEM_PROMPT.includes("6·25와 관계없는"));
+  assert.ok(!E.SYSTEM_PROMPT.includes("6·25와 관계있는"));
+  assert.ok(E.SYSTEM_PROMPT.includes("오늘 주제와 관계없는"));
+  assert.ok(E.SYSTEM_PROMPT.includes('"3-2.m01"'));
+  assert.ok(!/misconception "m01"/.test(E.SYSTEM_PROMPT));
+});
+test("lesson goes into the message", async () => {
+  const { fake, s } = makeL([{ ...CHECK, misconception: "u-2.m1" }, V("revisit")], "3-3");
+  await s.submitItems(three);
+  assert.ok(fake.calls[0].messages[0].content.includes("[오늘 차시: 교과서A 3단원 3~4차시 셋째 차시]"));
+  assert.equal(s.getState().misconception, "u-2.m1");
+});
+test("misconception from a later lesson or old id form is dropped", async () => {
+  for (const id of ["u-2.m2", "m01"]) {
+    const { s } = makeL([{ ...CHECK, misconception: id }], "3-3");
+    await s.submitItems(three);
+    assert.equal(s.getState().misconception, null, id);
+  }
+});
