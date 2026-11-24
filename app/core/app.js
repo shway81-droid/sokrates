@@ -100,6 +100,10 @@
       help.item && line("살펴볼 생각", help.item),
       help.truth && line("교과서 내용", help.truth),
       line("펼쳐 볼 곳", help.where),
+      help.notes && help.notes.length > 0 && el("div", { class: "notes" }, [
+        el("span", { class: "k", text: "바로 설명할 내용" }),
+        el("ul", {}, help.notes.map((n) => el("li", {}, [el("span", { text: n.text }), el("span", { class: "page", text: ` (${n.page}쪽)` })]))),
+      ]),
       help.hints.length > 0 && line("이어서 물어볼 것", help.hints.join(" · ")),
     ]);
   }

@@ -48,12 +48,18 @@
     const m = state.misconception && topic.misconceptions.find((x) => x.id === state.misconception);
     const src = m && m.sources[textbookId];
     const lesson = src && findLesson(src.lesson);
+    // 바로 설명할 내용: 고른 교과서에 실린 개념 문장과 그 쪽(교과서 대조 검증을 마친 문장)
+    const note = (c) => ({ text: c.text, page: c.sources[textbookId].page });
+    const inBook = (c) => c && c.sources && c.sources[textbookId];
     if (m && lesson) {
-      return { item, truth: m.truth, where: `${tb.name} ${lessonText(lesson)} ${lesson.title} ${src.page}쪽`, hints: m.counterHints.slice() };
+      const notes = (m.concepts || []).map((id) => topic.concepts.find((c) => c.id === id)).filter(inBook).map(note);
+      return { item, truth: m.truth, where: `${tb.name} ${lessonText(lesson)} ${lesson.title} ${src.page}쪽`, hints: m.counterHints.slice(), notes };
     }
     const today = lessonId != null && findLesson(lessonId);
     const where = today ? `${tb.name} ${lessonText(today)} ${today.title}` : `${tb.name} ${tb.lessons.map(lessonText).join(", ")}`;
-    return { item, truth: null, where, hints: [] };
+    // 단원 마무리처럼 오늘 차시가 없으면 범위가 너무 넓어 비워 둡니다.
+    const notes = today ? topic.concepts.filter((c) => inBook(c) && c.sources[textbookId].lesson === today.id).map(note) : [];
+    return { item, truth: null, where, hints: [], notes };
   }
 
   // el("div", {class: "x", onclick: fn}, [자식...]) — 글자는 textContent로만 넣어 HTML 주입을 막습니다.

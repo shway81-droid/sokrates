@@ -52,3 +52,25 @@ test("teacher help: no misconception points to today's lesson", () => {
   assert.equal(h.where, "아이스크림미디어 3단원 12차시 6·25 전쟁 이후 달라진 사회와 사람들의 생활 모습을 알아볼까요");
   assert.equal(h.truth, null);
 });
+
+// 바로 설명할 내용: 검증된 개념 문장을 고른 교과서 쪽과 함께 보여 줍니다.
+const C = (id) => D.concepts.find((c) => c.id === `3-2.${id}`);
+test("teacher help notes: a misconception shows its linked concepts with the chosen textbook page", () => {
+  const h = U.teacherHelp(D, "chunjae", doneState({}));
+  assert.deepEqual(h.notes, [{ text: C("c12").text, page: "151·152" }, { text: C("c13").text, page: "151" }]);
+  assert.deepEqual(U.teacherHelp(D, "visang", doneState({})).notes.map((n) => n.page), ["142", "142·145"]);
+});
+test("teacher help notes: a linked concept missing from the chosen textbook is left out", () => {
+  const T = { ...D, misconceptions: D.misconceptions.map((m) => (m.id === "3-2.m01" ? { ...m, concepts: [...m.concepts, "3-2.c34"] } : m)) };
+  assert.ok(!C("c34").sources.chunjae);
+  assert.deepEqual(U.teacherHelp(T, "chunjae", doneState({})).notes.map((n) => n.text), [C("c12").text, C("c13").text]);
+});
+test("teacher help notes: without a misconception, today's lesson concepts for the chosen textbook", () => {
+  const h = U.teacherHelp(D, "icecream", doneState({ misconception: null }), "3-12");
+  const want = D.concepts.filter((c) => c.sources.icecream && c.sources.icecream.lesson === "3-12");
+  assert.ok(want.length >= 3);
+  assert.deepEqual(h.notes, want.map((c) => ({ text: c.text, page: c.sources.icecream.page })));
+});
+test("teacher help notes: unit wrap-up without a misconception shows none", () => {
+  assert.deepEqual(U.teacherHelp(D, "chunjae", doneState({ misconception: null })).notes, []);
+});
