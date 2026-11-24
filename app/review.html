@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>6·25 자료 검토</title>
+  <title>주제 자료 검토</title>
   <style>
     :root {
       --bg: #fbf6ec; --paper: #fffdf8; --ink: #2b2118; --soft: #6b5a48; --line: #e6d9c3;
@@ -58,6 +58,8 @@
     .bar button { font: inherit; font-weight: 700; padding: 10px 22px; border: 0; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; }
     .msg { color: var(--done); font-weight: 700; }
     [hidden] { display: none !important; }
+    .topic-pick { display: flex; gap: 12px; align-items: center; font-weight: 700; margin: 0 0 16px; }
+    .topic-pick select { font: inherit; padding: 6px 12px; border-radius: 10px; }
     @media (max-width: 720px) {
       .pair { grid-template-columns: 1fr; }
       .arrow { transform: rotate(90deg); justify-self: center; }
@@ -66,7 +68,7 @@
 </head>
 <body>
 <main>
-  <h1>6·25 자료 검토</h1>
+  <h1 id="title">주제 자료 검토</h1>
   <p class="lead">엘렌코스가 반례 질문과 판정에 쓰는 자료입니다. 세 교과서(천재·아이스크림·비상) 5학년 2학기 사회 3단원에서 뽑았습니다.</p>
   <div class="how">
     <strong>검토하는 방법</strong>
@@ -77,6 +79,7 @@
     </ol>
   </div>
 
+  <label class="topic-pick">묶음 <select id="topic" aria-label="검토할 묶음"></select></label>
   <div class="filters" role="group" aria-label="교과서로 거르기" id="filters"></div>
 
   <h2 id="m-title">오개념</h2>
@@ -106,19 +109,27 @@
 </div>
 
 <script src="data/units.js"></script>
+<script src="data/topic-3-1.js"></script>
 <script src="data/topic-3-2.js"></script>
 <script>
 (function () {
-  const topic = window.SOKRATES_TOPICS["3-2"];
-  const TB = topic.textbooks;
-  const STORE = "sok.review625";
-  const conceptById = Object.fromEntries(topic.concepts.map((c) => [c.id, c]));
+  // 불러온 묶음을 단원·묶음 순서로 나열하고, 고른 묶음 하나를 검토합니다.
+  const TOPICS = window.SOKRATES_TOPICS || {};
+  const order = (window.SOKRATES_UNITS || []).flatMap((u) => u.topics).filter((id) => TOPICS[id]);
+  const ids = [...order, ...Object.keys(TOPICS).filter((id) => !order.includes(id))];
+  let topic, TB, STORE, conceptById;
   let filter = "all";
 
-  // 체크·메모 저장(이 브라우저에만). 저장이 막혀도 화면은 그대로 씁니다.
+  // 체크·메모 저장(이 브라우저에만, 묶음마다 따로). 저장이 막혀도 화면은 그대로 씁니다.
   let saved = {};
-  try { saved = JSON.parse(localStorage.getItem(STORE) || "{}") || {}; } catch { saved = {}; }
   const persist = () => { try { localStorage.setItem(STORE, JSON.stringify(saved)); } catch { /* 무시 */ } };
+  function useTopic(id) {
+    topic = TOPICS[id]; TB = topic.textbooks; STORE = `sok.review.${topic.id}`;
+    conceptById = Object.fromEntries(topic.concepts.map((c) => [c.id, c]));
+    try { saved = JSON.parse(localStorage.getItem(STORE) || "{}") || {}; } catch { saved = {}; }
+    document.getElementById("title").textContent = `${topic.title} 자료 검토`;
+    document.title = `${topic.title} 자료 검토`;
+  }
   const entry = (id) => (saved[id] = saved[id] || { ok: false, memo: "" });
 
   function el(tag, attrs = {}, kids = []) {
@@ -130,11 +141,11 @@
     for (const k of [].concat(kids)) if (k != null && k !== false) n.append(k);
     return n;
   }
-  const lessonText = (l) => { const [u, c] = String(l).split("-"); return `${u}단원 ${c}차시`; };
+  const lessonText = (t, id) => { const l = t.lessons.find((x) => x.id === id); return `${String(id).split("-")[0]}단원 ${l ? l.no : String(id).split("-")[1]}차시`; };
   function sources(src) {
     return el("div", { class: "src" }, TB.map((t) => {
       const s = src[t.id];
-      return s ? el("span", { text: `${t.name} · ${lessonText(s.lesson)} · ${s.page}쪽` })
+      return s ? el("span", { text: `${t.name} · ${lessonText(t, s.lesson)} · ${s.page}쪽` })
                : el("span", { class: "none", text: `${t.name} 없음` });
     }));
   }
@@ -236,7 +247,7 @@
     };
     const ok = ids.filter(isOk), notYet = ids.filter((id) => !isOk(id));
     const memos = ids.filter((id) => entry(id).memo.trim());
-    const out = [`[6·25 자료 검토 결과] 확인 ${ok.length}/${ids.length}`, ""];
+    const out = [`[${topic.id} ${topic.title} 자료 검토 결과] 확인 ${ok.length}/${ids.length}`, ""];
     out.push("■ 맞아요: " + (ok.length ? ok.join(", ") : "없음"), "");
     if (memos.length) { out.push("■ 고칠 점"); memos.forEach((id) => out.push(`- ${label(id)}`, `  → ${entry(id).memo.trim()}`)); out.push(""); }
     out.push("■ 아직 안 본 것: " + (notYet.length ? notYet.join(", ") : "없음"));
@@ -251,6 +262,10 @@
     setTimeout(() => (msg.textContent = ""), 4000);
   });
 
+  const pick = document.getElementById("topic");
+  ids.forEach((id) => pick.append(el("option", { value: id, text: `${id} ${TOPICS[id].title}` })));
+  pick.addEventListener("change", () => { useTopic(pick.value); filter = "all"; render(); });
+  useTopic(ids[0]);
   render();
 })();
 </script>

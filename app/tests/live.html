@@ -47,16 +47,19 @@
 </main>
 
 <script src="../data/units.js"></script>
+<script src="../data/topic-3-1.js"></script>
 <script src="../data/topic-3-2.js"></script>
 <script src="../core/guard.js"></script>
 <script src="../core/topic.js"></script>
+<script src="../core/catalog.js"></script>
 <script src="../core/llm.js"></script>
 <script src="../methods/elenchus.js"></script>
 <script src="live-cases.js"></script>
 <script>
 (function () {
   const L = window.SokLLM, G = window.SokGuard, E = window.SokElenchus;
-  const topic = window.SOKRATES_TOPICS["3-2"];
+  const C = window.SokCatalog;
+  const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
   const cases = window.SokLiveCases.cases;
   const settings = L.loadSettings();
   const $ = (id) => document.getElementById(id);
@@ -76,7 +79,9 @@
       try { return await llm.call(req); } catch (e) { cause = String((e && e.message) || e).slice(0, 300); throw e; }
     } };
     const t0 = performance.now();
-    const s = E.createSession({ topic, textbookId: c.textbookId, llm: counted });
+    // 사례마다 시작 화면과 같은 방법으로 단원 전체 주제와 오늘 차시를 정합니다.
+    const sc = C.resolve(UNITS, TOPICS, { textbookId: c.textbookId, unitId: c.unitId, key: c.key });
+    const s = E.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted });
     const asked = [];
     let st = await s.submitItems(c.items);
     let i = 0;
@@ -85,11 +90,14 @@
       st = i < c.answers.length ? await s.submitAnswer(c.answers[i++]) : await s.finishNow();
     }
     const ms = performance.now() - t0;
-    const checksOk = !c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks);
+    const checksOk = (!c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks))
+      && (!c.expectOk || (st.checks && c.expectOk.every((i) => st.checks[i] === "ok"))); // 지난 차시 내용을 섞은 항목은 "ok"여야 합니다
     // 검사에 걸려 기본값으로 대신한 적이 있으면 프롬프트가 제대로 작동하지 않은 것이므로 "다름"으로 셉니다.
     const same = st.phase === "done" && st.verdict === c.expect && checksOk && st.fallbacks === 0;
     return { c, st, asked, calls, ms, same, checksOk, cause };
   }
+
+  const expectText = (c) => c.expect + (c.expectChecks ? ` (${c.expectChecks.join("/")})` : "") + (c.expectOk ? ` · ${c.expectOk.map((i) => i + 1).join(",")}번 ok` : "");
 
   function render(n, r) {
     const tr = document.createElement("tr");
@@ -103,7 +111,7 @@
     });
     tr.append(qs);
     tr.append(cell(r.st.phase === "error" ? `오류: ${r.cause || r.st.error}` : r.st.verdict || "-"));
-    tr.append(cell(r.c.expect + (r.c.expectChecks ? ` (${r.c.expectChecks.join("/")})` : "")));
+    tr.append(cell(expectText(r.c)));
     tr.append(cell(r.same ? "같음" : "다름", r.same ? "same" : "diff"));
     tr.append(cell(String(r.st.fallbacks), r.st.fallbacks ? "diff" : ""), cell(String(r.calls)), cell(`${(r.ms / 1000).toFixed(1)}초`));
     $("rows").append(tr);
@@ -113,7 +121,7 @@
     const esc = (s) => String(s).replace(/\|/g, "\\|");
     const out = [`모델 ${settings.model} · 노력 ${settings.effort} · ${new Date().toISOString().slice(0, 10)}`, "",
       "| # | 경우 | 확인 | 방식 | 질문 (글자 수) | 판정 | 기대 | 일치 | 대체 | 호출 | 시간 |", "|---|---|---|---|---|---|---|---|---|---|---|"];
-    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${r.st.checks ? r.st.checks.join("/") : "-"} | ${r.st.mode || "-"} | ${r.asked.map((q) => `${esc(q)} (${G.charLen(q)})`).join("<br>")} | ${r.st.phase === "error" ? `오류: ${esc(r.cause || "")}` : r.st.verdict} | ${r.c.expect} | ${r.same ? "같음" : "다름"} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
+    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${r.st.checks ? r.st.checks.join("/") : "-"} | ${r.st.mode || "-"} | ${r.asked.map((q) => `${esc(q)} (${G.charLen(q)})`).join("<br>")} | ${r.st.phase === "error" ? `오류: ${esc(r.cause || "")}` : r.st.verdict} | ${expectText(r.c)} | ${r.same ? "같음" : "다름"} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
     out.push("", summaryText());
     return out.join("\n");
   }
@@ -122,7 +130,11 @@
     const same = results.filter((r) => r.same).length;
     const long = results.flatMap((r) => r.asked).filter((q) => G.charLen(q) > G.MAX_CHARS).length;
     const fb = results.reduce((n, r) => n + r.st.fallbacks, 0);
-    return `판정 일치 ${same}/${results.length} · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번`;
+    const groups = [...new Set(results.map((r) => r.c.group))].map((g) => {
+      const rs = results.filter((r) => r.c.group === g);
+      return `${g} ${rs.filter((r) => r.same).length}/${rs.length}`;
+    }).join(" · ");
+    return `판정 일치 ${same}/${results.length} (${groups}) · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번`;
   }
 
   $("run").addEventListener("click", async () => {
