@@ -2,7 +2,7 @@
 (function (root) {
   const MAX_CHARS = 40;
   const FORBIDDEN = ["틀렸", "정답은", "오답"];
-  const CHECK_VALUES = ["ok", "think", "outside"];
+  const CHECK_VALUES = ["ok", "think", "unsure", "outside"];
   const MODES = ["counter", "reason", "retry"];
   const VERDICTS = ["strong", "revisit", "hold"];
 
@@ -38,10 +38,11 @@
 
   function checkSummary(summary, verdict) {
     if (!Array.isArray(summary) || summary.length !== 3) return "세 줄 정리가 3줄이 아님";
-    for (const line of summary) {
+    for (const [i, line] of summary.entries()) {
       if (typeof line !== "string" || !line.trim()) return "세 줄 정리에 빈 줄";
       const t = line.trim();
-      if (charLen(t) > MAX_CHARS) return `세 줄 정리 한 줄이 ${MAX_CHARS}자를 넘음`;
+      // 다시 낼 때 고칠 수 있게 몇 번째 줄이 몇 자인지 알려 줍니다.
+      if (charLen(t) > MAX_CHARS) return `세 줄 정리 ${i + 1}번째 줄이 ${charLen(t)}자로 ${MAX_CHARS}자를 넘음 — 더 짧게 줄일 것`;
       if (hasForbidden(t)) return "세 줄 정리에 금지어 포함";
       if (LABEL_PREFIX.test(t)) return "세 줄 정리 줄 앞에 칸 이름을 붙임";
       if (THIRD_PERSON.test(t)) return "세 줄 정리를 '학생이'처럼 3인칭으로 씀(학생에게 보여 주는 글)";
@@ -67,7 +68,7 @@
       const t = c[obj.target];
       if (obj.mode === "counter" && t !== "think") return { ok: false, reason: "counter 대상이 think가 아님" };
       if (obj.mode === "reason" && c.includes("think")) return { ok: false, reason: "다시 볼 항목이 있는데 reason" };
-      if (obj.mode === "retry" && t === "ok") return { ok: false, reason: "retry 대상이 ok" };
+      if (obj.mode === "retry" && (t === "ok" || t === "unsure")) return { ok: false, reason: "retry 대상이 ok나 unsure" };
       return checkQuestion(obj.question);
     }
     if (obj.stage === "question") return checkQuestion(obj.question);

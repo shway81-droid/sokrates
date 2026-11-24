@@ -50,3 +50,11 @@ test("lesson title is the learning problem shown at the top of the input screen"
   const w = [{ ...units[0], wrap: { a: { no: "6", title: "생각 그물을 완성해요" } } }];
   assert.equal(C.resolve(w, topics, { textbookId: "a", unitId: 3, key: "wrap" }).lessonTitle, "생각 그물을 완성해요");
 });
+
+test("source text: today's lesson text for the chosen textbook, else null", () => {
+  const texts = { a: { "3-3": "원문" } };
+  assert.equal(C.sourceText(texts, "a", "3-3"), "원문");
+  assert.equal(C.sourceText(texts, "a", null), null); // 단원 마무리
+  assert.equal(C.sourceText(texts, "b", "3-3"), null);
+  assert.equal(C.sourceText(undefined, "a", "3-3"), null); // 원문 파일이 없는 PC
+});

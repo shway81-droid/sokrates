@@ -55,3 +55,19 @@ test("summary: revisit second line states the corrected idea, not the process", 
 test("guard gives the reason so a retry can fix it", () => {
   assert.match(sv("strong", ["a", "b", "c"]).reason, /물음표/);
 });
+
+// unsure: 오늘 주제와 관계있지만 원문·개념에서 확인이 안 되는 항목. 반례·다시 말하기 대상이 아님.
+test("unsure is a valid check value", () => assert.ok(ck(["ok", "unsure", "think"], 2, "counter")));
+test("unsure is never a counter or retry target", () => {
+  assert.equal(ck(["ok", "unsure", "think"], 1, "counter"), false);
+  assert.equal(ck(["unsure", "outside", "ok"], 0, "retry"), false);
+  assert.ok(ck(["unsure", "outside", "ok"], 1, "retry"));
+});
+test("reason can be chosen with unsure items, on ok or unsure", () => {
+  assert.ok(ck(["ok", "unsure", "ok"], 0, "reason"));
+  assert.ok(ck(["unsure", "unsure", "unsure"], 1, "reason"));
+});
+test("summary reasons say which line and how long, so a retry can fix it", () => {
+  const r = sv("strong", ["a", "가".repeat(45), "정전과 종전은 어떻게 다를까요?"]).reason;
+  assert.ok(r.includes("2번째 줄") && r.includes("45자"), r);
+});

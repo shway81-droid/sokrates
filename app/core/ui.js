@@ -5,7 +5,7 @@
     revisit: { label: "다시 볼 생각", message: "모르는 것을 알게 되었어요. 다음 시간에 확인해 봐요." },
     hold: { label: "판정 보류", message: "선생님과 더 이야기해 봐요." },
   };
-  const CHECK_TEXT = { ok: "✓", think: "더 생각해 볼 것", outside: "교과서 밖 이야기예요" };
+  const CHECK_TEXT = { ok: "✓", think: "더 생각해 볼 것", unsure: "교과서에서 함께 찾아봐요", outside: "오늘 주제와 다른 이야기예요" };
   const SUMMARY_LABELS = ["알게 된 것", "다시 생각한 것", "다음 시간 확인할 것"];
 
   function formatElapsed(ms) {

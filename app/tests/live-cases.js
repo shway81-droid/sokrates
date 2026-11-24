@@ -87,6 +87,22 @@
     });
   }
 
+  // 교과서 원문 근거(2026-11-24): 요약 개념에서 빠졌지만 원문(천재 130·131쪽)에 있는 말은 ok여야 합니다.
+  // app/local/texts.js(원문 파일)가 있는 PC에서 돌려야 의미가 있습니다.
+  const SRC = "원문 근거";
+  cases.push({
+    name: "원문에만 있는 사실 · 천재교과서", ...at("chunjae", "3-4", SRC),
+    items: ["3·1 운동 때 많은 사람이 죽거나 다쳤다", "1919년에 독립 선언서를 발표했다", "유관순은 천안에서 만세 시위를 이끌었다"],
+    answers: ["일제가 총칼로 만세 시위를 무자비하게 진압해서 수많은 사람이 죽거나 다쳤어요."],
+    expect: "strong", expectMode: "reason", expectOk: [0],
+  });
+  cases.push({
+    name: "교실에서 나온 사례(띄어쓰기 없음) · 천재교과서", ...at("chunjae", "3-4", SRC),
+    items: ["31운동에 많은 사람들이 참여해서 죽거나 다쳤다", "31운동을 통해 임시정부가 세워졌다", "모르겠다"],
+    answers: ["몰라요.", "모르겠어요."],
+    expect: "hold", expectMode: "retry", expectChecks: ["ok", "ok", "outside"],
+  });
+
   const LiveCases = { cases };
   if (typeof module !== "undefined" && module.exports) module.exports = LiveCases;
   else root.SokLiveCases = LiveCases;

@@ -16,8 +16,9 @@ for (const f of fs.readdirSync(DATA).filter((f) => /^topic-\d+-\d+\.js$/.test(f)
 }
 const TBS = ["chunjae", "icecream", "visang"];
 
-test("live cases: 6·25 10건 + 3단원 새 사례 12건 = 22건", () => {
-  assert.equal(cases.length, 22);
+test("live cases: 6·25 10건 + 3단원 새 사례 12건 + 원문 근거 2건 = 24건", () => {
+  assert.equal(cases.length, 24);
+  assert.equal(cases.filter((c) => c.group === "원문 근거").length, 2);
   assert.equal(cases[0].name, "PRD 예시");
   assert.equal(cases.filter((c) => c.group === "6·25").length, 10);
   const fresh = cases.filter((c) => c.group === "3단원 새 사례");

@@ -18,7 +18,7 @@ test("verdict text exact", () => {
   assert.deepEqual(U.VERDICT_TEXT.revisit, { label: "다시 볼 생각", message: "모르는 것을 알게 되었어요. 다음 시간에 확인해 봐요." });
   assert.deepEqual(U.VERDICT_TEXT.hold, { label: "판정 보류", message: "선생님과 더 이야기해 봐요." });
 });
-test("check text", () => assert.deepEqual(U.CHECK_TEXT, { ok: "✓", think: "더 생각해 볼 것", outside: "교과서 밖 이야기예요" }));
+test("check text", () => assert.deepEqual(Object.keys(U.CHECK_TEXT), ["ok", "think", "unsure", "outside"]));
 test("result text has summary, no name field", () => {
   const t = U.resultText(sample);
   assert.ok(t.includes(sample.state.summary[2]));
@@ -89,4 +89,9 @@ test("rethink: none unless revisit with a target and a second summary line", () 
 test("result text carries the before → after line for revisit", () => {
   assert.ok(U.resultText(sample).includes("처음 생각: 전쟁은 1953년에 끝났다 → 고친 생각: 1953년에 전쟁이 멈췄다"));
   assert.ok(!U.resultText({ ...sample, state: { ...sample.state, verdict: "strong" } }).includes("처음 생각"));
+});
+
+test("check labels: unsure is gentle, outside means another topic", () => {
+  assert.equal(U.CHECK_TEXT.unsure, "교과서에서 함께 찾아봐요");
+  assert.equal(U.CHECK_TEXT.outside, "오늘 주제와 다른 이야기예요");
 });

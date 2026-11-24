@@ -119,6 +119,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .badge.ok { background: var(--ok-soft); color: var(--ok); font-size: 32px; padding: 0 16px; }
 .badge.think { background: var(--amber-soft); color: var(--amber); }
 .badge.outside { background: var(--outside-soft); color: var(--outside); }
+.badge.unsure { background: var(--accent-soft); color: var(--accent); }
 
 /* 문답 */
 .history { font-size: 26px; color: var(--ink-soft); border-left: 6px solid var(--line); padding-left: 20px; }

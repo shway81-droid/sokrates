@@ -49,6 +49,8 @@
 <script src="../data/units.js"></script>
 <script src="../data/topic-3-1.js"></script>
 <script src="../data/topic-3-2.js"></script>
+<!-- 교과서 원문: 선생님 PC에만 있는 파일(tools/build_local_texts.py로 만듦). 없으면 요약 개념만으로 판단합니다. -->
+<script src="../local/texts.js" onerror="this.remove()"></script>
 <script src="../core/guard.js"></script>
 <script src="../core/topic.js"></script>
 <script src="../core/catalog.js"></script>
@@ -82,7 +84,8 @@
     const t0 = performance.now();
     // 사례마다 시작 화면과 같은 방법으로 단원 전체 주제와 오늘 차시를 정합니다.
     const sc = C.resolve(UNITS, TOPICS, { textbookId: c.textbookId, unitId: c.unitId, key: c.key });
-    const s = E.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted });
+    const s = E.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted,
+      sourceText: C.sourceText(window.SOKRATES_TEXTS, sc.textbookId, sc.choice.lessonId) });
     const asked = [];
     let st = await s.submitItems(c.items);
     let i = 0;

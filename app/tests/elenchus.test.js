@@ -234,3 +234,70 @@ test("prompt: a student who only insists is hold, not revisit or strong", () => 
   const rule = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith('- "hold"'));
   assert.ok(rule && rule.includes("끝까지 고집") && rule.includes("스스로 고쳐 말했을 때만"));
 });
+
+// ---- 교과서 원문으로 판단하기 (2026-11-24 설계: textbook-source) ----
+test("today's textbook text goes into a cached system block", async () => {
+  const fake = fakeLLM([CHECK]);
+  const s = E.createSession({ topic: mini, textbookId: "a", llm: fake, sourceText: "=== p.130 ===\n수많은 사람이 죽거나 다쳤다." });
+  await s.submitItems(three);
+  const sys = fake.calls[0].system;
+  assert.ok(Array.isArray(sys), "원문이 있으면 system이 블록 배열");
+  assert.equal(sys[0].text, E.SYSTEM_PROMPT);
+  assert.ok(sys[1].text.startsWith("[오늘 차시 교과서 원문]") && sys[1].text.includes("수많은 사람이 죽거나 다쳤다"));
+  assert.deepEqual(sys[1].cache_control, { type: "ephemeral" });
+});
+test("blank textbook text keeps the plain system prompt", async () => {
+  const fake = fakeLLM([CHECK]);
+  const s = E.createSession({ topic: mini, textbookId: "a", llm: fake, sourceText: "  " });
+  await s.submitItems(three);
+  assert.equal(fake.calls[0].system, E.SYSTEM_PROMPT);
+});
+test("prompt: judge by the textbook text, and 'outside' only for unrelated talk", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("[오늘 차시 교과서 원문]"));
+  assert.ok(p.includes('"unsure"'));
+  assert.ok(p.includes("표현이 달라도"));
+});
+test("check schema and state accept unsure", async () => {
+  assert.ok(E.SCHEMAS.check.properties.checks.items.enum.includes("unsure"));
+  const { s } = make([{ ...CHECK, checks: ["ok", "unsure", "think"] }]);
+  assert.deepEqual((await s.submitItems(three)).checks, ["ok", "unsure", "think"]);
+});
+test("prompt: 'think' only for a real misconception or a clear contradiction", () => {
+  const line = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.trim().startsWith('"think"'));
+  assert.ok(line && line.includes("분명히 어긋남") && line.includes("덜 자세하거나"));
+  assert.ok(E.SYSTEM_PROMPT.includes("원문은 학생 말이 교과서에 있는지 찾는 데"));
+});
+
+test("think needs the misconception's wrong claim inside the student's own sentence", () => {
+  const line = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.trim().startsWith('"think"'));
+  assert.ok(line.includes("실제로 들어 있어야"), line);
+});
+
+test("summary rules ask for short lines and a real question on the third line", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("30자 안팎"));
+  const third = p.split(/\r?\n/).find((l) => l.startsWith('- 셋째 줄'));
+  assert.ok(third.includes("근거나 사실 문장으로 쓰지 않습니다"), third);
+});
+
+// 세 줄을 배열 자리로만 받으면 AI가 학생이 말한 3가지를 그대로 옮겨 적어 셋째 줄이 질문이 아니게 되는 일이 잦았습니다.
+test("summary schema names each line so the third one is clearly the question", () => {
+  for (const sch of [E.SCHEMAS.next, E.SCHEMAS.verdict]) {
+    const s = sch.properties.summary;
+    assert.equal(s.type, "object");
+    assert.deepEqual(s.required, ["learned", "rethought", "nextQuestion"]);
+    assert.ok(s.properties.nextQuestion.description.includes("물음표"));
+  }
+});
+
+test("named summary from the AI becomes the three lines in order", async () => {
+  const named = { stage: "verdict", question: "", verdict: "strong",
+    summary: { learned: "북한이 남침했다", rethought: "정전 협정을 근거로 댔다", nextQuestion: "정전과 종전은 어떻게 다를까요?" } };
+  const { s } = make([CHECK, named]);
+  await s.submitItems(three);
+  const st = await s.submitAnswer("정전 협정이에요");
+  assert.equal(st.verdict, "strong");
+  assert.deepEqual(st.summary, ["북한이 남침했다", "정전 협정을 근거로 댔다", "정전과 종전은 어떻게 다를까요?"]);
+  assert.equal(st.fallbacks, 0);
+});

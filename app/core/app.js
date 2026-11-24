@@ -341,7 +341,8 @@
     if (!settings.apiKey) { show("settings"); return; }
     const sc = current();
     app.scope = sc;
-    app.session = method().createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: liveLLM });
+    app.session = method().createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: liveLLM,
+      sourceText: Cat.sourceText(root.SOKRATES_TEXTS, sc.textbookId, sc.choice.lessonId) });
     startTimer();
     show("input");
   }

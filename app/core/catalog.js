@@ -56,7 +56,13 @@
     };
   }
 
-  const SokCatalog = { availableUnits, textbooksOf, lessonChoices, resolve };
+  // 선생님 PC에만 있는 교과서 원문(app/local/texts.js)에서 오늘 차시 글을 꺼냅니다. 없으면 null.
+  function sourceText(texts, textbookId, lessonId) {
+    const t = lessonId != null && texts && texts[textbookId] && texts[textbookId][lessonId];
+    return typeof t === "string" && t.trim() ? t : null;
+  }
+
+  const SokCatalog = { availableUnits, textbooksOf, lessonChoices, resolve, sourceText };
   if (typeof module !== "undefined" && module.exports) module.exports = SokCatalog;
   else root.SokCatalog = SokCatalog;
 })(this);
