@@ -24,6 +24,7 @@ const CHECK = { stage: "check", checks: ["ok", "ok", "think"], target: 2, mode: 
 const REASON = { stage: "check", checks: ["ok", "ok", "ok"], target: 0, mode: "reason", question: "왜 그렇게 되었을까요?" };
 const Q = (q) => ({ stage: "question", question: q, verdict: "none", summary: [] });
 const V = (v) => ({ stage: "verdict", question: "", verdict: v, summary: ["알게 된 것", "다시 생각한 것", "정전과 종전은 어떻게 다를까요?"] });
+const msgText = (req) => req.messages[0].content.map((b) => b.text).join("\n");
 const make = (responses) => { const fake = fakeLLM(responses); return { fake, s: E.createSession({ topic: mini, textbookId: "a", llm: fake }) }; };
 
 test("rejects blank items", async () => { const { s } = make([]); await assert.rejects(s.submitItems(["a", " ", "c"])); });
@@ -128,13 +129,13 @@ test("prompt carries scope and items", async () => {
   const req = fake.calls[0];
   assert.equal(req.system, E.SYSTEM_PROMPT);
   assert.equal(req.messages.length, 1); assert.equal(req.messages[0].role, "user");
-  assert.ok(req.messages[0].content.includes("[반례에 쓸 수 있는 범위: 교과서A]"));
-  assert.ok(req.messages[0].content.includes(three[2]));
+  assert.ok(msgText(req).includes("[반례에 쓸 수 있는 범위: 교과서A]"));
+  assert.ok(msgText(req).includes(three[2]));
 });
 test("later prompt carries turns", async () => {
   const { fake, s } = make([CHECK, Q("정전은 끝낸 것일까요, 멈춘 것일까요?")]);
   await s.submitItems(three); await s.submitAnswer("정전 협정이요");
-  assert.ok(fake.calls[1].messages[0].content.includes("정전 협정이요"));
+  assert.ok(msgText(fake.calls[1]).includes("정전 협정이요"));
   assert.equal(fake.calls[1].schema, E.SCHEMAS.next);
 });
 test("state is a copy", async () => {
@@ -187,7 +188,7 @@ test("prompt is not tied to 6·25", () => {
 test("lesson goes into the message", async () => {
   const { fake, s } = makeL([{ ...CHECK, misconception: "u-2.m1" }, V("revisit")], "3-3");
   await s.submitItems(three);
-  assert.ok(fake.calls[0].messages[0].content.includes("[오늘 차시: 교과서A 3단원 3~4차시 셋째 차시]"));
+  assert.ok(msgText(fake.calls[0]).includes("[오늘 차시: 교과서A 3단원 3~4차시 셋째 차시]"));
   assert.equal(s.getState().misconception, "u-2.m1");
 });
 test("misconception from a later lesson or old id form is dropped", async () => {
@@ -205,9 +206,9 @@ test("retry tells the AI why the first answer was rejected", async () => {
   await s.submitItems(three);
   const st = await s.finishNow();
   assert.equal(st.verdict, "revisit"); assert.equal(st.fallbacks, 0);
-  const second = fake.calls.at(-1).messages[0].content;
+  const second = msgText(fake.calls.at(-1));
   assert.ok(second.includes("검사에 걸렸") && second.includes("고친 생각"), "다시 물을 때 까닭이 없음");
-  assert.ok(!fake.calls.at(-2).messages[0].content.includes("검사에 걸렸"));
+  assert.ok(!msgText(fake.calls.at(-2)).includes("검사에 걸렸"));
 });
 test("prompt: summary rules for each line", () => {
   const p = E.SYSTEM_PROMPT;
@@ -221,14 +222,14 @@ test("a too-long question is retried with the same request (no nudge toward a ve
   const { fake, s } = make([CHECK, longQ, Q("정전은 끝낸 것일까요, 멈춘 것일까요?")]);
   await s.submitItems(three);
   await s.submitAnswer("정전 협정이요");
-  assert.equal(fake.calls[1].messages[0].content, fake.calls[2].messages[0].content);
+  assert.deepEqual(fake.calls[1].messages[0].content, fake.calls[2].messages[0].content);
 });
 test("summary retry asks to keep the verdict", async () => {
   const bad = { stage: "verdict", question: "", verdict: "revisit", summary: ["a", "b", "c"] };
   const { fake, s } = make([CHECK, bad, V("revisit")]);
   await s.submitItems(three);
   await s.finishNow();
-  assert.ok(fake.calls.at(-1).messages[0].content.includes("판정은 그대로"));
+  assert.ok(msgText(fake.calls.at(-1)).includes("판정은 그대로"));
 });
 test("prompt: a student who only insists is hold, not revisit or strong", () => {
   const rule = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith('- "hold"'));
@@ -306,4 +307,16 @@ test("summary rules say what the second line is after a retry with no counterexa
   const p = E.SYSTEM_PROMPT;
   assert.ok(p.includes("다시 말해 보게 하기(retry)로 끝난 판정 보류"));
   assert.ok(p.includes('"반례"'));
+});
+
+// 차시마다 같은 단원 개념 글은 메시지 첫 블록에 두고 캐시합니다. 학생마다 다른 글만 둘째 블록에 둡니다.
+test("unit context is the cached first block of the message", async () => {
+  const { fake, s } = make([CHECK, Q("정전은 끝낸 것일까요, 멈춘 것일까요?"), V("revisit")]);
+  await s.submitItems(three); await s.submitAnswer("1"); await s.submitAnswer("2");
+  const [ctx, rest] = fake.calls[0].messages[0].content;
+  assert.ok(ctx.text.includes("[반례에 쓸 수 있는 범위: 교과서A]"));
+  assert.deepEqual(ctx.cache_control, { type: "ephemeral" });
+  assert.ok(!rest.text.includes("[반례에 쓸 수 있는 범위") && rest.text.includes(three[2]));
+  assert.equal(rest.cache_control, undefined);
+  assert.ok(fake.calls.every((c) => JSON.stringify(c.messages[0].content[0]) === JSON.stringify(ctx)), "모든 호출에서 같은 캐시 블록");
 });

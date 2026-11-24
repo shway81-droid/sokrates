@@ -149,8 +149,10 @@ ${text}`, cache_control: { type: "ephemeral" } },
 
     const snapshot = () => JSON.parse(JSON.stringify(state));
 
-    function buildMessage(task) {
-      const lines = [context, "", "[학생이 말한 배운 3가지]"];
+    // 메시지는 두 블록입니다. 첫 블록(단원 개념)은 같은 차시 동안 늘 같아서 캐시해 두고 싸게 다시 읽고,
+    // 둘째 블록에는 학생마다 바뀌는 글만 둡니다. 글의 차례는 캐시 전과 같습니다(차례를 바꾸면 판단이 달라졌음).
+    function buildMessage(task, note = "") {
+      const lines = ["[학생이 말한 배운 3가지]"];
       state.items.forEach((it, i) => lines.push(`${i}. ${it}`));
       if (state.mode) {
         lines.push("", `[대상 항목] ${state.target}번 / 방식: ${MODE_TEXT[state.mode]}`);
@@ -160,7 +162,11 @@ ${text}`, cache_control: { type: "ephemeral" } },
         state.turns.forEach((t, i) => lines.push(`질문${i + 1}: ${t.q}`, `학생 답${i + 1}: ${t.a}`));
       }
       lines.push("", `지금 할 일: ${task}`);
-      return lines.join("\n");
+      if (note) lines.push("", note);
+      return [
+        { type: "text", text: context, cache_control: { type: "ephemeral" } },
+        { type: "text", text: lines.join("\n") },
+      ];
     }
 
     // AI를 부르고 검사합니다. 검사에 두 번 걸리면 null을 돌려줍니다. AI 오류는 그대로 throw합니다.
@@ -175,7 +181,7 @@ ${text}`, cache_control: { type: "ephemeral" } },
         // 세 줄 정리가 걸렸을 때만 까닭을 알려 줍니다. 질문이 걸렸을 때 까닭을 알리면
         // AI가 질문 대신 판정으로 넘어가 버리는 일이 있어(차시별 테스트), 그때는 같은 요청을 다시 보냅니다.
         if (out && out.stage === "verdict")
-          content = `${buildMessage(task)}\n\n[앞 응답이 검사에 걸렸어요: ${v.reason}] 판정은 그대로 두고 이 점만 고쳐 다시 내세요.`;
+          content = buildMessage(task, `[앞 응답이 검사에 걸렸어요: ${v.reason}] 판정은 그대로 두고 이 점만 고쳐 다시 내세요.`);
       }
       state.fallbacks++;
       return null;
