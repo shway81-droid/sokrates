@@ -23,3 +23,9 @@ test("verdict bad label", () => assert.equal(G.validateStep({stage:"verdict",ver
 test("verdict valid", () => assert.ok(G.validateStep({stage:"verdict",verdict:"revisit",summary:["알게 된 것","다시 생각한 것","정전과 종전은 어떻게 다를까요?"]},["verdict"]).ok));
 test("default summary is valid verdict", () => assert.ok(G.validateStep({stage:"verdict",verdict:"hold",summary:G.DEFAULT_SUMMARY},["verdict"]).ok));
 test("null object rejected", () => assert.equal(G.validateStep(null,["check"]).ok,false));
+
+// 코드가 대상·방식의 짝을 검사합니다(맞는 항목에 반례를 던지지 않음, 교과서 밖 항목은 반례 대상이 아님).
+const ck = (checks, target, mode) => G.validateStep({ stage: "check", checks, target, mode, question: "왜 그럴까요?" }, ["check"]).ok;
+test("counter must target a think item", () => { assert.equal(ck(["ok", "ok", "think"], 0, "counter"), false); assert.equal(ck(["ok", "outside", "think"], 1, "counter"), false); assert.ok(ck(["ok", "ok", "think"], 2, "counter")); });
+test("reason only when nothing to rethink", () => { assert.equal(ck(["ok", "think", "ok"], 0, "reason"), false); assert.ok(ck(["ok", "ok", "ok"], 0, "reason")); });
+test("retry never targets an ok item", () => { assert.equal(ck(["ok", "think", "think"], 0, "retry"), false); assert.ok(ck(["outside", "outside", "outside"], 0, "retry")); assert.ok(ck(["ok", "think", "think"], 1, "retry")); });

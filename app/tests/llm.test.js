@@ -25,3 +25,8 @@ test("no thinking/temperature fields", () => { const r = L.buildRequest(args); a
 test("parse response text block", () => assert.deepEqual(L.parseResponse({ stop_reason: "end_turn", content: [{ type: "thinking", thinking: "" }, { type: "text", text: '{"a":1}' }] }), { a: 1 }));
 test("refusal throws", () => assert.throws(() => L.parseResponse({ stop_reason: "refusal", content: [] }), /거절/));
 test("no text block throws", () => assert.throws(() => L.parseResponse({ stop_reason: "end_turn", content: [] })));
+test("client gives up a hung request quickly", () => {
+  const o = L.clientOptions("k");
+  assert.equal(o.apiKey, "k"); assert.equal(o.dangerouslyAllowBrowser, true);
+  assert.ok(o.timeout <= 45000, "timeout"); assert.ok(o.maxRetries <= 1, "maxRetries");
+});

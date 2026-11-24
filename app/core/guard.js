@@ -52,6 +52,11 @@
       if (!Number.isInteger(obj.target) || obj.target < 0 || obj.target > 2)
         return { ok: false, reason: "target 범위 오류" };
       if (!MODES.includes(obj.mode)) return { ok: false, reason: "mode 오류" };
+      // 방식과 대상의 짝: 맞는 항목엔 반례를 던지지 않고, 교과서 밖 항목은 반례 대상이 아닙니다.
+      const t = c[obj.target];
+      if (obj.mode === "counter" && t !== "think") return { ok: false, reason: "counter 대상이 think가 아님" };
+      if (obj.mode === "reason" && c.includes("think")) return { ok: false, reason: "다시 볼 항목이 있는데 reason" };
+      if (obj.mode === "retry" && t === "ok") return { ok: false, reason: "retry 대상이 ok" };
       return checkQuestion(obj.question);
     }
     if (obj.stage === "question") return checkQuestion(obj.question);

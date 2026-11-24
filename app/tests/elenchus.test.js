@@ -128,3 +128,13 @@ test("state is a copy", async () => {
   st.items.push("x");
   assert.equal(s.getState().items.length, 3);
 });
+test("fallbacks are counted so a live check can see them", async () => {
+  const bad = { stage: "check", checks: ["ok"], target: 0, mode: "counter", question: "x" };
+  const { s } = make([bad, bad, V("revisit")]);
+  let st = await s.submitItems(three);
+  assert.equal(st.fallbacks, 1);
+  st = await s.finishNow();
+  assert.equal(st.fallbacks, 1);
+  const { s: s2 } = make([CHECK]);
+  assert.equal((await s2.submitItems(three)).fallbacks, 0);
+});

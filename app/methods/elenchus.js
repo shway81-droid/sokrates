@@ -87,6 +87,7 @@
     return {
       phase: "input", items: [], checks: null, target: null, mode: null, turns: [],
       question: null, maxQuestions: 3, verdict: null, summary: null, error: null,
+      fallbacks: 0, // 검사에 두 번 걸려 기본값으로 대신한 횟수(점검 페이지가 봅니다)
     };
   }
 
@@ -121,6 +122,7 @@
         if (gen !== generation) throw CANCELLED; // 기다리는 동안 [다음 학생]을 눌렀으면 결과를 버립니다
         if (G.validateStep(out, allowedStages).ok) return out;
       }
+      state.fallbacks++;
       return null;
     }
 

@@ -70,6 +70,11 @@
     return sdkPromise;
   }
 
+  // 학교망이 응답 없이 끊어도 오래 기다리지 않게 합니다(최악 약 90초 뒤 오류 화면).
+  function clientOptions(apiKey) {
+    return { apiKey, dangerouslyAllowBrowser: true, timeout: 45000, maxRetries: 1 };
+  }
+
   function createClaudeLLM(settings) {
     let client = null;
     return {
@@ -77,7 +82,7 @@
         if (!client) {
           const mod = await loadSdk();
           const Anthropic = mod.default || mod.Anthropic;
-          client = new Anthropic({ apiKey: settings.apiKey, dangerouslyAllowBrowser: true });
+          client = new Anthropic(clientOptions(settings.apiKey));
         }
         const msg = await client.beta.messages.create(
           buildRequest({ model: settings.model, effort: settings.effort, system, messages, schema }));
@@ -86,7 +91,7 @@
     };
   }
 
-  const SokLLM = { SDK_URL, MODELS, EFFORTS, DEFAULTS, KEYS, loadSettings, saveSettings, clearKey, buildRequest, parseResponse, createClaudeLLM };
+  const SokLLM = { SDK_URL, MODELS, EFFORTS, DEFAULTS, KEYS, loadSettings, saveSettings, clearKey, buildRequest, parseResponse, clientOptions, createClaudeLLM };
   if (typeof module !== "undefined" && module.exports) module.exports = SokLLM;
   else root.SokLLM = SokLLM;
 })(this);
