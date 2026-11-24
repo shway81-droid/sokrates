@@ -167,7 +167,7 @@ test("prompt is not tied to 6·25", () => {
   assert.ok(!E.SYSTEM_PROMPT.includes("6·25와 관계있는"));
   assert.ok(E.SYSTEM_PROMPT.includes("오늘 주제와 관계없는"));
   assert.ok(E.SYSTEM_PROMPT.includes('"3-2.m01"'));
-  assert.ok(!/misconception "m01"/.test(E.SYSTEM_PROMPT));
+  assert.ok(!E.SYSTEM_PROMPT.includes('"m01"'), "옛 id 형식 예시가 남아 있음");
 });
 test("lesson goes into the message", async () => {
   const { fake, s } = makeL([{ ...CHECK, misconception: "u-2.m1" }, V("revisit")], "3-3");
