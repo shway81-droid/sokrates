@@ -1,6 +1,6 @@
 // 교사 화면 제어: 설정 → 시작(방법·주제·교과서) → 배운 3가지 → 확인과 반례 문답 → 판정과 정리
 (function (root) {
-  const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, teacherHelp } = root.SokUI;
+  const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp } = root.SokUI;
   const L = root.SokLLM;
   const T = root.SokTopic;
   const Cat = root.SokCatalog;
@@ -106,6 +106,13 @@
       ]),
       help.hints.length > 0 && line("이어서 물어볼 것", help.hints.join(" · ")),
     ]);
+  }
+
+  // 다시 볼 생각일 때 무엇이 바뀌었는지 두 줄로 보여 줍니다.
+  function rethinkBox(r) {
+    if (!r) return null;
+    const row = (k, v) => el("p", {}, [el("span", { class: "k", text: k }), el("span", { text: v })]);
+    return el("div", { class: "rethink" }, [row("처음 생각", r.before), row("고친 생각", r.after)]);
   }
 
   function toast(msg) {
@@ -275,7 +282,10 @@
       const sc = app.scope;
       const meta = { topicTitle: sc.contextTitle, textbookName: `${sc.textbookName} ${sc.lessonLabel}`, dateStr: today(), state: st };
       return el("section", { class: "stack" }, [
-        el("div", { class: `verdict ${st.verdict}` }, [el("div", { class: "label", text: v.label }), el("div", { class: "msg", text: v.message })]),
+        el("div", { class: `verdict ${st.verdict}` }, [
+          el("div", { class: "label", text: v.label }), el("div", { class: "msg", text: v.message }),
+          rethinkBox(rethink(st)),
+        ]),
         el("div", { class: "card" }, [el("ul", { class: "summary" }, st.summary.map((line, i) =>
           el("li", {}, [el("span", { class: "k", text: SUMMARY_LABELS[i] }), el("span", { text: line })])))]),
         helperBox(teacherHelp(sc.topic, sc.textbookId, st, sc.choice.lessonId)),

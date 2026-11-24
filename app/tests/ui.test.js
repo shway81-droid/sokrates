@@ -74,3 +74,19 @@ test("teacher help notes: without a misconception, today's lesson concepts for t
 test("teacher help notes: unit wrap-up without a misconception shows none", () => {
   assert.deepEqual(U.teacherHelp(D, "chunjae", doneState({ misconception: null })).notes, []);
 });
+
+// 다시 볼 생각: 학생이 처음 적은 항목과 세 줄 정리의 "다시 생각한 것"을 나란히 보여 줍니다.
+test("rethink: revisit pairs the target item with the rethought line", () => {
+  assert.deepEqual(U.rethink(sample.state), { before: "전쟁은 1953년에 끝났다", after: "1953년에 전쟁이 멈췄다" });
+});
+test("rethink: none unless revisit with a target and a second summary line", () => {
+  assert.equal(U.rethink({ ...sample.state, verdict: "strong" }), null);
+  assert.equal(U.rethink({ ...sample.state, verdict: "hold" }), null);
+  assert.equal(U.rethink({ ...sample.state, target: null }), null);
+  assert.equal(U.rethink({ ...sample.state, summary: ["하나"] }), null);
+  assert.equal(U.rethink({ ...sample.state, summary: ["하나", "  "] }), null);
+});
+test("result text carries the before → after line for revisit", () => {
+  assert.ok(U.resultText(sample).includes("처음 생각: 전쟁은 1953년에 끝났다 → 고친 생각: 1953년에 전쟁이 멈췄다"));
+  assert.ok(!U.resultText({ ...sample, state: { ...sample.state, verdict: "strong" } }).includes("처음 생각"));
+});

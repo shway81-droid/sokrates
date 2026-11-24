@@ -13,6 +13,15 @@
     return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
   }
 
+  // 다시 볼 생각일 때 무엇이 바뀌었는지: 학생이 처음 적은 대상 항목 → 세 줄 정리의 "다시 생각한 것"
+  function rethink(state) {
+    if (!state || state.verdict !== "revisit" || state.target == null || !state.items) return null;
+    const before = state.items[state.target];
+    const after = state.summary && typeof state.summary[1] === "string" ? state.summary[1].trim() : "";
+    return before && after ? { before, after } : null;
+  }
+  const rethinkText = (r) => `처음 생각: ${r.before} → 고친 생각: ${r.after}`;
+
   function resultText({ topicTitle, textbookName, dateStr, state }) {
     const lines = [`[엘렌코스 학습정리] ${topicTitle} · ${textbookName} · ${dateStr}`, "", "배운 3가지"];
     state.items.forEach((it, i) => {
@@ -26,6 +35,8 @@
     if (state.verdict) {
       const v = VERDICT_TEXT[state.verdict];
       lines.push("", `판정: ${v.label} — ${v.message}`);
+      const r = rethink(state);
+      if (r) lines.push(rethinkText(r));
     }
     if (state.summary) {
       lines.push("", "세 줄 정리");
@@ -75,7 +86,7 @@
     return node;
   }
 
-  const SokUI = { VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, teacherHelp, el };
+  const SokUI = { VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp, el };
   if (typeof module !== "undefined" && module.exports) module.exports = SokUI;
   else root.SokUI = SokUI;
 })(this);

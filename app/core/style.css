@@ -145,6 +145,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .verdict.strong { background: var(--strong-soft); color: var(--strong); }
 .verdict.revisit { background: var(--revisit-soft); color: var(--revisit); }
 .verdict.hold { background: var(--hold-soft); color: var(--hold); }
+.verdict .rethink { margin-top: 14px; padding-top: 14px; border-top: 2px dashed currentColor; display: grid; gap: 6px; font-size: 28px; }
+.verdict .rethink p { margin: 0; display: grid; grid-template-columns: 6.5em 1fr; gap: 12px; align-items: baseline; }
+.verdict .rethink .k { font-weight: 800; }
+.verdict .rethink p:first-child span:last-child { text-decoration: line-through; text-decoration-thickness: 2px; opacity: .75; }
 .summary { list-style: none; padding: 0; margin: 0; }
 .summary li { display: grid; grid-template-columns: 8.5em 1fr; gap: 16px; padding: 14px 0; border-bottom: 2px dashed var(--line); }
 .summary li:last-child { border-bottom: 0; }
@@ -182,6 +186,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   .card, .verdict { box-shadow: none; border: 1px solid #bbb; padding: 12px 16px; }
   .verdict .label { font-size: 22pt; }
   .verdict .msg { font-size: 13pt; }
+  .verdict .rethink { font-size: 12pt; }
   .record { font-size: 11pt; color: #333; }
   /* 닫힌 상태로 Ctrl+P 해도 문답 기록이 인쇄되게 합니다. */
   .record > summary { display: none !important; }
