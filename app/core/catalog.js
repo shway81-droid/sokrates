@@ -51,6 +51,8 @@
       topic,
       contextTitle: choice.topicId ? topics[choice.topicId].title : unit.title,
       lessonLabel: lesson ? `${lesson.no}차시` : "단원 마무리",
+      // 입력 화면 맨 위에 보여 줄 학습문제: 차시 제목, 단원 마무리면 그 교과서의 마무리 제목
+      lessonTitle: lesson ? lesson.title : (unit.wrap && unit.wrap[tb.id] && unit.wrap[tb.id].title) || "단원 마무리",
     };
   }
 

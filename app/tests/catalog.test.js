@@ -45,3 +45,8 @@ test("same lesson id in another textbook is re-resolved", () => {
   assert.deepEqual(C.lessonChoices(r.unit, topics, "b").map((c) => c.key), ["3-1", "wrap"]);
 });
 test("textbooks of a unit", () => assert.deepEqual(C.textbooksOf(C.availableUnits(units, topics)[0], topics).map((t) => t.id), ["a", "b"]));
+test("lesson title is the learning problem shown at the top of the input screen", () => {
+  assert.equal(C.resolve(units, topics, { textbookId: "a", unitId: 3, key: "3-3" }).lessonTitle, "셋째 차시");
+  const w = [{ ...units[0], wrap: { a: { no: "6", title: "생각 그물을 완성해요" } } }];
+  assert.equal(C.resolve(w, topics, { textbookId: "a", unitId: 3, key: "wrap" }).lessonTitle, "생각 그물을 완성해요");
+});

@@ -201,7 +201,9 @@
         await p;
         after(s);
       });
+      const sc = current();
       return el("section", { class: "stack" }, [
+        el("div", { class: "goal" }, [el("span", { class: "k", text: "학습문제" }), el("p", { text: sc.lessonTitle })]),
         el("h1", { text: "오늘 배운 3가지를 말해 볼까요?" }),
         el("div", { class: "card items-input" }, boxes.map((b, i) =>
           el("div", { class: "item-line" }, [el("span", { class: "num", text: String(i + 1) }), b]))),
