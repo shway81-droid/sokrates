@@ -30,7 +30,7 @@
 <body>
 <main>
   <h1>실제 AI 점검 (엘렌코스)</h1>
-  <p class="lead">가상 학생 10명을 실제 Claude에 차례로 보내고, 질문·판정이 기대와 같은지 봅니다. 학생 이름은 쓰지 않습니다.</p>
+  <p class="lead">가상 학생 <span id="count"></span>명을 실제 Claude에 차례로 보내고, 질문·판정이 기대와 같은지 봅니다. 학생 이름은 쓰지 않습니다.</p>
   <p id="key-note" class="note" hidden>저장된 API 키가 없어요. <a href="../index.html">앱</a>의 [설정]에서 키를 넣고 이 페이지를 새로 고쳐 주세요.</p>
   <p id="settings" class="lead"></p>
   <div class="row">
@@ -66,6 +66,7 @@
   const results = [];
 
   $("settings").textContent = `모델 ${settings.model} · 노력 ${settings.effort}`;
+  $("count").textContent = cases.length;
   if (!settings.apiKey) { $("key-note").hidden = false; $("run").disabled = true; }
 
   function cell(text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; return td; }
