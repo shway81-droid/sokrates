@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>소크라테스 학습정리</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="core/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">?</span>
+      <span class="brand-name">소크라테스 학습정리</span>
+      <span class="brand-method" id="bar-method"></span>
+    </div>
+    <div class="bar-right">
+      <span class="chip" id="bar-context" hidden></span>
+      <span class="timer" id="bar-timer" hidden aria-label="지난 시간">0:00</span>
+      <button class="icon-btn" id="bar-home" type="button" hidden>처음으로</button>
+      <button class="icon-btn" id="bar-settings" type="button">설정</button>
+    </div>
+  </header>
+
+  <main id="screen" aria-live="polite"></main>
+
+  <!-- 순서가 중요합니다: 데이터 → 공통 부품 → 방법 → 화면 제어 -->
+  <script src="data/topic-625.js"></script>
+  <script src="core/guard.js"></script>
+  <script src="core/topic.js"></script>
+  <script src="core/llm.js"></script>
+  <script src="core/ui.js"></script>
+  <script src="methods/elenchus.js"></script>
+  <script src="core/app.js"></script>
+</body>
+</html>
