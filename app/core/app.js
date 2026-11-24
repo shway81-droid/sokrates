@@ -307,7 +307,7 @@
     },
   };
 
-  const MODEL_LABEL = { "claude-haiku-5-5": "Claude Haiku 5.5 (빠름 · 기본)", "claude-sonnet-5-5": "Claude Sonnet 5.5", "claude-opus-5-5": "Claude Opus 5.5 (가장 깊게)" };
+  const MODEL_LABEL = { "claude-haiku-5-5": "Claude Haiku 5.5 (빠름 · 가장 저렴)", "claude-sonnet-5-5": "Claude Sonnet 5.5 (기본)", "claude-opus-5-5": "Claude Opus 5.5 (가장 깊게)" };
   const EFFORT_LABEL = { low: "낮음 (빠름)", medium: "보통", high: "높음 (느림)" };
 
   function after(s) {

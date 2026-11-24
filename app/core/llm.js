@@ -3,7 +3,7 @@
   const SDK_URL = "https://cdn.jsdelivr.net/npm/@anthropic-ai/sdk@1.13.0/+esm";
   const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
   const EFFORTS = ["low", "medium", "high"];
-  const DEFAULTS = { model: "claude-haiku-5-5", effort: "low" };
+  const DEFAULTS = { model: "claude-sonnet-5-5", effort: "low" };
   const KEYS = { apiKey: "sok.apiKey", model: "sok.model", effort: "sok.effort" };
   // 안전 문제로 답을 거절하면 다른 모델이 대신 답하는 서버 기능 (Haiku 5.5는 지원하지 않음)
   const FALLBACK_MODELS = ["claude-opus-5-5", "claude-sonnet-5-5"];
