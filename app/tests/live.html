@@ -69,7 +69,11 @@
   async function runCase(c) {
     const llm = L.createClaudeLLM(settings);
     let calls = 0;
-    const counted = { call(req) { calls++; return llm.call(req); } };
+    let cause = null; // 실제 오류 원인(상태 코드와 API 메시지). 키는 들어 있지 않습니다.
+    const counted = { async call(req) {
+      calls++;
+      try { return await llm.call(req); } catch (e) { cause = String((e && e.message) || e).slice(0, 300); throw e; }
+    } };
     const t0 = performance.now();
     const s = E.createSession({ topic, textbookId: c.textbookId, llm: counted });
     const asked = [];
@@ -83,7 +87,7 @@
     const checksOk = !c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks);
     // 검사에 걸려 기본값으로 대신한 적이 있으면 프롬프트가 제대로 작동하지 않은 것이므로 "다름"으로 셉니다.
     const same = st.phase === "done" && st.verdict === c.expect && checksOk && st.fallbacks === 0;
-    return { c, st, asked, calls, ms, same, checksOk };
+    return { c, st, asked, calls, ms, same, checksOk, cause };
   }
 
   function render(n, r) {
@@ -97,7 +101,7 @@
       p.append(document.createTextNode(q), num); qs.append(p);
     });
     tr.append(qs);
-    tr.append(cell(r.st.phase === "error" ? `오류: ${r.st.error}` : r.st.verdict || "-"));
+    tr.append(cell(r.st.phase === "error" ? `오류: ${r.cause || r.st.error}` : r.st.verdict || "-"));
     tr.append(cell(r.c.expect + (r.c.expectChecks ? ` (${r.c.expectChecks.join("/")})` : "")));
     tr.append(cell(r.same ? "같음" : "다름", r.same ? "same" : "diff"));
     tr.append(cell(String(r.st.fallbacks), r.st.fallbacks ? "diff" : ""), cell(String(r.calls)), cell(`${(r.ms / 1000).toFixed(1)}초`));
@@ -108,7 +112,7 @@
     const esc = (s) => String(s).replace(/\|/g, "\\|");
     const out = [`모델 ${settings.model} · 노력 ${settings.effort} · ${new Date().toISOString().slice(0, 10)}`, "",
       "| # | 경우 | 확인 | 방식 | 질문 (글자 수) | 판정 | 기대 | 일치 | 대체 | 호출 | 시간 |", "|---|---|---|---|---|---|---|---|---|---|---|"];
-    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${r.st.checks ? r.st.checks.join("/") : "-"} | ${r.st.mode || "-"} | ${r.asked.map((q) => `${esc(q)} (${G.charLen(q)})`).join("<br>")} | ${r.st.phase === "error" ? "오류" : r.st.verdict} | ${r.c.expect} | ${r.same ? "같음" : "다름"} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
+    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${r.st.checks ? r.st.checks.join("/") : "-"} | ${r.st.mode || "-"} | ${r.asked.map((q) => `${esc(q)} (${G.charLen(q)})`).join("<br>")} | ${r.st.phase === "error" ? `오류: ${esc(r.cause || "")}` : r.st.verdict} | ${r.c.expect} | ${r.same ? "같음" : "다름"} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
     out.push("", summaryText());
     return out.join("\n");
   }
