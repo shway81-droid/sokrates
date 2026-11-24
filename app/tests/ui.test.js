@@ -28,3 +28,22 @@ test("result text has summary, no name field", () => {
   assert.ok(!/(이름|학생)\s*:/.test(t), "학생 이름 칸이 없어야 함");
   assert.ok(!/틀렸|점수/.test(t));
 });
+
+const D = require("./load").load("data/topic-625.js");
+const doneState = (over) => ({ phase: "done", items: ["북한이 남침했다", "유엔군이 도와주었다", "전쟁은 1953년에 끝났다"],
+  checks: ["ok", "ok", "think"], target: 2, mode: "counter", turns: [], misconception: "m01", verdict: "hold", summary: [], ...over });
+test("teacher help: none for a strong verdict", () => assert.equal(U.teacherHelp(D, "chunjae", doneState({ verdict: "strong" })), null));
+test("teacher help: textbook truth, page and hints for the chosen textbook", () => {
+  const h = U.teacherHelp(D, "chunjae", doneState({}));
+  assert.equal(h.item, "전쟁은 1953년에 끝났다");
+  assert.equal(h.truth, D.misconceptions[0].truth);
+  assert.equal(h.where, "천재교과서 3단원 11차시 151쪽");
+  assert.deepEqual(h.hints, D.misconceptions[0].counterHints);
+  assert.equal(U.teacherHelp(D, "visang", doneState({ verdict: "revisit" })).where, "비상교육 3단원 11차시 142쪽");
+});
+test("teacher help: without a misconception, point to the textbook lessons", () => {
+  const h = U.teacherHelp(D, "chunjae", doneState({ misconception: null, mode: "retry", checks: ["think", "think", "outside"], target: 0 }));
+  assert.equal(h.truth, null);
+  assert.ok(h.where.startsWith("천재교과서 3단원 11차시"));
+  assert.deepEqual(h.hints, []);
+});

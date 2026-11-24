@@ -34,6 +34,22 @@
     return lines.join("\n");
   }
 
+  const lessonText = (l) => { const [u, c] = String(l).split("-"); return `${u}단원 ${c}차시`; };
+
+  // 판정 보류·다시 볼 생각일 때 선생님이 이어서 짚어 줄 것: 교과서 내용, 펼쳐 볼 쪽, 이어서 물어볼 것
+  function teacherHelp(topic, textbookId, state) {
+    if (!state || (state.verdict !== "hold" && state.verdict !== "revisit")) return null;
+    const tb = topic.textbooks.find((t) => t.id === textbookId);
+    if (!tb) return null;
+    const item = state.target != null && state.items ? state.items[state.target] || null : null;
+    const m = state.misconception && topic.misconceptions.find((x) => x.id === state.misconception);
+    const src = m && m.sources[textbookId];
+    if (m && src) {
+      return { item, truth: m.truth, where: `${tb.name} ${lessonText(src.lesson)} ${src.page}쪽`, hints: m.counterHints.slice() };
+    }
+    return { item, truth: null, where: `${tb.name} ${tb.lessons.join(", ")}`, hints: [] };
+  }
+
   // el("div", {class: "x", onclick: fn}, [자식...]) — 글자는 textContent로만 넣어 HTML 주입을 막습니다.
   function el(tag, attrs = {}, children = []) {
     const node = document.createElement(tag);
@@ -47,7 +63,7 @@
     return node;
   }
 
-  const SokUI = { VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, el };
+  const SokUI = { VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, teacherHelp, el };
   if (typeof module !== "undefined" && module.exports) module.exports = SokUI;
   else root.SokUI = SokUI;
 })(this);

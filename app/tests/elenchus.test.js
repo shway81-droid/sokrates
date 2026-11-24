@@ -144,3 +144,14 @@ test("reason question must be answerable from the chosen textbook", () => {
 test("a student who revises the target idea is revisit, not strong", () => {
   assert.ok(E.SYSTEM_PROMPT.includes("처음 말한 대상 항목을 고쳐 말하면"));
 });
+test("check keeps the misconception id only when it is in the chosen textbook", async () => {
+  const withId = (id) => ({ ...CHECK, misconception: id });
+  for (const [id, want] of [["m1", "m1"], ["m3", null], ["none", null], [undefined, null]]) {
+    const { s } = make([id === undefined ? CHECK : withId(id)]);
+    assert.equal((await s.submitItems(three)).misconception, want, String(id));
+  }
+});
+test("check schema asks for the misconception id", () => {
+  assert.ok(E.SCHEMAS.check.required.includes("misconception"));
+  assert.ok(E.SYSTEM_PROMPT.includes("misconception"));
+});

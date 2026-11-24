@@ -1,6 +1,6 @@
 // 교사 화면 제어: 설정 → 시작(방법·주제·교과서) → 배운 3가지 → 확인과 반례 문답 → 판정과 정리
 (function (root) {
-  const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText } = root.SokUI;
+  const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, teacherHelp } = root.SokUI;
   const L = root.SokLLM;
   const T = root.SokTopic;
   const TEXTBOOK_KEY = "sok.textbook";
@@ -85,6 +85,19 @@
   if (typeof window !== "undefined") window.addEventListener("beforeprint", () => {
     const d = document.querySelector("details.record"); if (d) d.open = true;
   });
+
+  // 판정 보류·다시 볼 생각일 때만 보이는 접힌 상자. TV에서 학생에게 답이 바로 보이지 않게 접어 둡니다.
+  function helperBox(help) {
+    if (!help) return null;
+    const line = (k, v) => el("p", {}, [el("span", { class: "k", text: k }), el("span", { text: v })]);
+    return el("details", { class: "helper card no-print" }, [
+      el("summary", { text: "선생님 도움말" }),
+      help.item && line("살펴볼 생각", help.item),
+      help.truth && line("교과서 내용", help.truth),
+      line("펼쳐 볼 곳", help.where),
+      help.hints.length > 0 && line("이어서 물어볼 것", help.hints.join(" · ")),
+    ]);
+  }
 
   function toast(msg) {
     const t = el("div", { class: "toast", role: "status", text: msg });
@@ -252,6 +265,7 @@
         el("div", { class: `verdict ${st.verdict}` }, [el("div", { class: "label", text: v.label }), el("div", { class: "msg", text: v.message })]),
         el("div", { class: "card" }, [el("ul", { class: "summary" }, st.summary.map((line, i) =>
           el("li", {}, [el("span", { class: "k", text: SUMMARY_LABELS[i] }), el("span", { text: line })])))]),
+        helperBox(teacherHelp(topic(), app.textbookId, st)),
         el("details", { class: "record card" }, [
           el("summary", { text: "문답 기록 보기" }),
           el("p", { text: `${meta.topicTitle} · ${meta.textbookName} · ${meta.dateStr} · ${formatElapsed((app.stoppedAt || Date.now()) - app.startedAt)}` }),

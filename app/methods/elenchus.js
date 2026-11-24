@@ -29,6 +29,7 @@
   2) 없고 6·25와 관계없는 항목이 있으면 그 항목, mode "retry" — "오늘 배운 것 중에서 하나 더 말해 볼까요?"처럼 다시 말해 보게 합니다
   3) 세 항목이 모두 "outside"이면 첫 항목, mode "retry"
   4) 모두 맞으면 이유가 [반례에 쓸 수 있는 범위]에 나와 있는 항목, mode "reason" — "왜 그렇게 되었을까요?"처럼 이유를 묻습니다. 교과서에 까닭이 나오지 않는 것(예: 작전이 성공한 까닭)은 묻지 않습니다
+- misconception: target이 [반례에 쓸 수 있는 범위]의 흔한 오개념에 해당하면 그 id(예: "m01"), 아니면 "none"
 - question: 첫 질문
 
 판정(stage "verdict"):
@@ -39,7 +40,7 @@
 
 예시(천재교과서):
 학생: ① 북한이 남침했다 ② 유엔군이 도와주었다 ③ 전쟁은 1953년에 끝났다
-확인: checks ["ok","ok","think"], target 2, mode "counter", question "1953년에 맺은 협정의 이름은 무엇이었나요?"
+확인: checks ["ok","ok","think"], target 2, mode "counter", misconception "m01", question "1953년에 맺은 협정의 이름은 무엇이었나요?"
 학생 답: 정전 협정이요. → 다음 질문: "정전은 전쟁을 끝낸 것일까요, 멈춘 것일까요?"
 학생 답: 아, 멈춘 거예요. 그럼 끝난 건 아니네요. → 판정 "revisit", summary ["북한의 남침과 국제 연합군의 참전", "1953년에 전쟁이 끝난 게 아니라 멈췄다", "정전과 종전은 어떻게 다를까요?"]`;
 
@@ -52,9 +53,10 @@
         checks: { type: "array", items: { type: "string", enum: ["ok", "think", "outside"] } },
         target: { type: "integer", enum: [0, 1, 2] },
         mode: { type: "string", enum: ["counter", "reason", "retry"] },
+        misconception: STR,
         question: STR,
       },
-      required: ["stage", "checks", "target", "mode", "question"],
+      required: ["stage", "checks", "target", "mode", "misconception", "question"],
       additionalProperties: false,
     },
     next: {
@@ -87,12 +89,14 @@
     return {
       phase: "input", items: [], checks: null, target: null, mode: null, turns: [],
       question: null, maxQuestions: 3, verdict: null, summary: null, error: null,
+      misconception: null, // 선생님 도움말에 쓰는 오개념 id(고른 교과서 범위 안일 때만)
       fallbacks: 0, // 검사에 두 번 걸려 기본값으로 대신한 횟수(점검 페이지가 봅니다)
     };
   }
 
   function createSession({ topic, textbookId, llm }) {
     const context = T.buildContext(topic, textbookId);
+    const scopeMiscIds = new Set(T.scopeFor(topic, textbookId).misconceptions.map((m) => m.id));
     let state = initialState();
     let generation = 0; // cancel() 때마다 올려서 늦게 온 응답을 버립니다
     let lastAction = null;
@@ -139,6 +143,7 @@
         SCHEMAS.check, ["check"]);
       if (out) {
         Object.assign(state, { checks: out.checks, target: out.target, mode: out.mode, question: out.question.trim() });
+        state.misconception = scopeMiscIds.has(out.misconception) ? out.misconception : null;
       } else {
         Object.assign(state, { checks: ["think", "think", "think"], target: 0, mode: "counter", question: G.DEFAULT_QUESTION });
       }

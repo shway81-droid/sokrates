@@ -150,6 +150,10 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .summary li:last-child { border-bottom: 0; }
 .summary .k { font-weight: 800; color: var(--accent); }
 .record { font-size: 24px; color: var(--ink-soft); }
+.helper { border-color: #f0c27a; background: var(--amber-soft); }
+.helper summary { cursor: pointer; font-weight: 800; color: #6b4300; }
+.helper p { margin: 14px 0 0; }
+.helper .k { display: block; font-weight: 800; color: var(--accent); }
 .record summary { cursor: pointer; font-weight: 700; }
 .toast {
   position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); background: var(--ink); color: var(--paper);
