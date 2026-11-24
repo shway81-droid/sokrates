@@ -36,6 +36,7 @@
 - "strong"(튼튼한 생각): 학생이 반례에도 교과서 근거를 대며 생각을 지켰거나, 이유를 근거 있게 설명했습니다.
 - "revisit"(다시 볼 생각): 학생이 "그러면 아닌가?"처럼 스스로 허점을 인정했습니다. 학생이 처음 말한 대상 항목을 고쳐 말하면(예: "아, 군인만이 아니었네요") 근거를 함께 말했더라도 "strong"이 아니라 "revisit"입니다.
 - "hold"(판정 보류): 어느 쪽도 아니거나, 끝까지 오늘 주제와 관계있는 내용이 나오지 않았습니다.
+- 이유 묻기(mode "reason")에서 학생 답이 맞는 방향이지만 교과서 근거(까닭)가 빠졌으면, 바로 판정하지 말고 정답을 말하지 않은 채 그 까닭을 스스로 찾게 하는 질문을 한 번 더 합니다(예: "나라를 구하기 위해서" → "무엇으로부터 나라를 구하려 했을까요?").
 - summary: [알게 된 것, 다시 생각한 것, 다음 시간 확인할 것] 세 줄
 
 예시(천재교과서):
@@ -147,7 +148,7 @@
       } else {
         Object.assign(state, { checks: ["think", "think", "think"], target: 0, mode: "counter", question: G.DEFAULT_QUESTION });
       }
-      state.maxQuestions = state.mode === "reason" ? 1 : 3;
+      state.maxQuestions = state.mode === "reason" ? 2 : 3;
       state.phase = "asking";
     }
 

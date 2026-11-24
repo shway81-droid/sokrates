@@ -41,11 +41,25 @@ test("counter flow ends after 3 answers", async () => {
   assert.equal(st.phase, "done"); assert.equal(st.turns.length, 3); assert.equal(st.verdict, "revisit");
   assert.equal(fake.calls.at(-1).schema, E.SCHEMAS.verdict);
 });
-test("reason mode asks once", async () => {
-  const { s } = make([REASON, V("strong")]);
+test("reason mode: a clear reason can be judged after one answer", async () => {
+  const { fake, s } = make([REASON, V("strong")]);
   await s.submitItems(three);
-  const st = await s.submitAnswer("이유");
-  assert.equal(st.maxQuestions, 1); assert.equal(st.phase, "done"); assert.equal(st.verdict, "strong");
+  const st = await s.submitAnswer("일본이 쳐들어와서 나라를 지키려고요");
+  assert.equal(st.maxQuestions, 2); assert.equal(st.phase, "done"); assert.equal(st.verdict, "strong");
+  assert.equal(fake.calls.at(-1).schema, E.SCHEMAS.next); // AI가 더 물을지 판정할지 고를 수 있었음
+});
+test("reason mode: a vague reason gets one follow-up, then a verdict", async () => {
+  const { fake, s } = make([REASON, Q("무엇으로부터 나라를 구하려 했을까요?"), V("strong")]);
+  await s.submitItems(three);
+  let st = await s.submitAnswer("나라를 구하기 위해서");
+  assert.equal(st.phase, "asking"); assert.equal(st.question, "무엇으로부터 나라를 구하려 했을까요?");
+  st = await s.submitAnswer("일본이 쳐들어와서요");
+  assert.equal(st.phase, "done"); assert.equal(st.turns.length, 2); assert.equal(st.verdict, "strong");
+  assert.equal(fake.calls.at(-1).schema, E.SCHEMAS.verdict); // 두 번째 답 뒤에는 반드시 판정
+});
+test("prompt: reason without a textbook cause gets a follow-up, not the answer", () => {
+  const rule = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.includes('mode "reason"') && l.includes("한 번 더"));
+  assert.ok(rule && rule.includes("근거") && rule.includes("정답"), "이유 묻기 후속 질문 규칙이 없음");
 });
 test("early verdict accepted", async () => {
   const { s } = make([CHECK, V("revisit")]);
@@ -68,9 +82,10 @@ test("guard fail then success uses second", async () => {
 });
 test("guard fail on verdict falls back to hold", async () => {
   const badV = { stage: "verdict", question: "", verdict: "strong", summary: ["하나", "둘"] };
-  const { s } = make([REASON, badV, badV]);
+  const { s } = make([REASON, Q("무엇 때문이었을까요?"), badV, badV]);
   await s.submitItems(three);
-  const st = await s.submitAnswer("이유");
+  await s.submitAnswer("이유");
+  const st = await s.submitAnswer("근거"); // 이유 묻기는 두 번째 답 뒤에 반드시 판정합니다
   assert.equal(st.verdict, "hold"); assert.deepEqual(st.summary, G.DEFAULT_SUMMARY);
 });
 test("finishNow goes to verdict", async () => {
