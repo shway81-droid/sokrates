@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>실제 AI 점검</title>
+  <style>
+    :root { --bg: #fbf6ec; --paper: #fffdf8; --ink: #2b2118; --soft: #6b5a48; --line: #e6d9c3; --accent: #1f6f6b; --same: #2f7a3e; --diff: #a65f00; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.5 "Noto Sans KR", "Malgun Gothic", sans-serif; }
+    main { max-width: 1280px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    .lead, .note { color: var(--soft); }
+    .note { background: #fff1d6; border-radius: 10px; padding: 10px 14px; color: #6b4300; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0; }
+    button { font: inherit; font-weight: 700; padding: 10px 20px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    button.secondary { background: var(--paper); color: var(--ink); border: 2px solid var(--line); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--paper); }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+    th { background: #f3eadb; white-space: nowrap; }
+    td.same { color: var(--same); font-weight: 700; }
+    td.diff { color: var(--diff); font-weight: 700; }
+    .q { margin: 0 0 4px; }
+    .q .n { color: var(--soft); font-variant-numeric: tabular-nums; }
+    .q.long .n { color: var(--diff); font-weight: 700; }
+    #summary { font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>실제 AI 점검 (엘렌코스)</h1>
+  <p class="lead">가상 학생 10명을 실제 Claude에 차례로 보내고, 질문·판정이 기대와 같은지 봅니다. 학생 이름은 쓰지 않습니다.</p>
+  <p id="key-note" class="note" hidden>저장된 API 키가 없어요. <a href="../index.html">앱</a>의 [설정]에서 키를 넣고 이 페이지를 새로 고쳐 주세요.</p>
+  <p id="settings" class="lead"></p>
+  <div class="row">
+    <button id="run" type="button">모두 실행</button>
+    <button id="copy" type="button" class="secondary" disabled>결과를 표(Markdown)로 복사</button>
+    <span id="summary" aria-live="polite"></span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>#</th><th>경우</th><th>확인</th><th>방식</th><th>질문 (글자 수)</th><th>판정</th><th>기대</th><th>일치</th><th>호출</th><th>시간</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="../data/topic-625.js"></script>
+<script src="../core/guard.js"></script>
+<script src="../core/topic.js"></script>
+<script src="../core/llm.js"></script>
+<script src="../methods/elenchus.js"></script>
+<script src="live-cases.js"></script>
+<script>
+(function () {
+  const L = window.SokLLM, G = window.SokGuard, E = window.SokElenchus;
+  const topic = window.SOKRATES_TOPICS["625"];
+  const cases = window.SokLiveCases.cases;
+  const settings = L.loadSettings();
+  const $ = (id) => document.getElementById(id);
+  const results = [];
+
+  $("settings").textContent = `모델 ${settings.model} · 노력 ${settings.effort}`;
+  if (!settings.apiKey) { $("key-note").hidden = false; $("run").disabled = true; }
+
+  function cell(text, cls) { const td = document.createElement("td"); td.textContent = text; if (cls) td.className = cls; return td; }
+
+  async function runCase(c) {
+    const llm = L.createClaudeLLM(settings);
+    let calls = 0;
+    const counted = { call(req) { calls++; return llm.call(req); } };
+    const t0 = performance.now();
+    const s = E.createSession({ topic, textbookId: c.textbookId, llm: counted });
+    const asked = [];
+    let st = await s.submitItems(c.items);
+    let i = 0;
+    while (st.phase === "asking") {
+      asked.push(st.question);
+      st = i < c.answers.length ? await s.submitAnswer(c.answers[i++]) : await s.finishNow();
+    }
+    const ms = performance.now() - t0;
+    const checksOk = !c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks);
+    const same = st.phase === "done" && st.verdict === c.expect && checksOk;
+    return { c, st, asked, calls, ms, same, checksOk };
+  }
+
+  function render(n, r) {
+    const tr = document.createElement("tr");
+    tr.append(cell(String(n)), cell(r.c.name), cell(r.st.checks ? r.st.checks.join(" / ") : "-"), cell(r.st.mode || "-"));
+    const qs = document.createElement("td");
+    r.asked.forEach((q) => {
+      const len = G.charLen(q);
+      const p = document.createElement("p"); p.className = "q" + (len > G.MAX_CHARS ? " long" : "");
+      const num = document.createElement("span"); num.className = "n"; num.textContent = ` (${len})`;
+      p.append(document.createTextNode(q), num); qs.append(p);
+    });
+    tr.append(qs);
+    tr.append(cell(r.st.phase === "error" ? `오류: ${r.st.error}` : r.st.verdict || "-"));
+    tr.append(cell(r.c.expect + (r.c.expectChecks ? ` (${r.c.expectChecks.join("/")})` : "")));
+    tr.append(cell(r.same ? "같음" : "다름", r.same ? "same" : "diff"));
+    tr.append(cell(String(r.calls)), cell(`${(r.ms / 1000).toFixed(1)}초`));
+    $("rows").append(tr);
+  }
+
+  function markdown() {
+    const esc = (s) => String(s).replace(/\|/g, "\\|");
+    const out = [`모델 ${settings.model} · 노력 ${settings.effort} · ${new Date().toISOString().slice(0, 10)}`, "",
+      "| # | 경우 | 확인 | 방식 | 질문 (글자 수) | 판정 | 기대 | 일치 | 호출 | 시간 |", "|---|---|---|---|---|---|---|---|---|---|"];
+    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${r.st.checks ? r.st.checks.join("/") : "-"} | ${r.st.mode || "-"} | ${r.asked.map((q) => `${esc(q)} (${G.charLen(q)})`).join("<br>")} | ${r.st.phase === "error" ? "오류" : r.st.verdict} | ${r.c.expect} | ${r.same ? "같음" : "다름"} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
+    out.push("", summaryText());
+    return out.join("\n");
+  }
+
+  function summaryText() {
+    const same = results.filter((r) => r.same).length;
+    const long = results.flatMap((r) => r.asked).filter((q) => G.charLen(q) > G.MAX_CHARS).length;
+    return `판정 일치 ${same}/${results.length} · 40자 넘는 질문 ${long}개`;
+  }
+
+  $("run").addEventListener("click", async () => {
+    $("run").disabled = true; $("copy").disabled = true; $("rows").textContent = ""; results.length = 0;
+    for (let i = 0; i < cases.length; i++) {
+      $("summary").textContent = `${i + 1}/${cases.length} 실행 중…`;
+      const r = await runCase(cases[i]);
+      results.push(r); render(i + 1, r);
+    }
+    $("summary").textContent = summaryText();
+    $("run").disabled = false; $("copy").disabled = false;
+  });
+
+  $("copy").addEventListener("click", async () => {
+    const text = markdown();
+    try { await navigator.clipboard.writeText(text); $("summary").textContent = "복사했어요 · " + summaryText(); }
+    catch { const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  });
+})();
+</script>
+</body>
+</html>
