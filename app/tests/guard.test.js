@@ -29,3 +29,29 @@ const ck = (checks, target, mode) => G.validateStep({ stage: "check", checks, ta
 test("counter must target a think item", () => { assert.equal(ck(["ok", "ok", "think"], 0, "counter"), false); assert.equal(ck(["ok", "outside", "think"], 1, "counter"), false); assert.ok(ck(["ok", "ok", "think"], 2, "counter")); });
 test("reason only when nothing to rethink", () => { assert.equal(ck(["ok", "think", "ok"], 0, "reason"), false); assert.ok(ck(["ok", "ok", "ok"], 0, "reason")); });
 test("retry never targets an ok item", () => { assert.equal(ck(["ok", "think", "think"], 0, "retry"), false); assert.ok(ck(["outside", "outside", "outside"], 0, "retry")); assert.ok(ck(["ok", "think", "think"], 1, "retry")); });
+
+// 세 줄 정리 모양 검사(차시별 테스트 2026-11-24에서 나온 문제)
+const sv = (verdict, summary) => G.validateStep({ stage: "verdict", verdict, summary }, ["verdict"]);
+const Q3 = "정전과 종전은 어떻게 다를까요?";
+test("summary: third line must be a question", () => {
+  assert.equal(sv("strong", ["의병이 일어났다", "나라를 지키려 했다", "1948년 정부 수립을 더 확인해 보기"]).ok, false);
+});
+test("summary: no field label inside a line", () => {
+  assert.equal(sv("hold", ["a", "b", "다음 시간 확인할 것: 6·25 전쟁 때 무슨 일이 있었을까요?"]).ok, false);
+  assert.equal(sv("hold", ["알게 된 것: 의병이 일어났다", "b", Q3]).ok, false);
+});
+test("summary: no third-person '학생이' at the start of a line", () => {
+  assert.equal(sv("hold", ["학생이 오늘 주제와 관계없는 말을 했어요", "b", Q3]).ok, false);
+  assert.equal(sv("hold", ["a", "학생은 게임 이야기만 했어요", Q3]).ok, false);
+  assert.ok(sv("strong", ["학생들이 광주에서 시위를 벌였다", "b", Q3]).ok); // 내용으로 쓰인 '학생들'은 괜찮음
+});
+test("summary: revisit second line states the corrected idea, not the process", () => {
+  for (const bad of ["처음에는 대통령을 뽑는 선거라고 생각했다", "처음에는 이봉창이라 생각했지만 다시 떠올려 고쳤다",
+    "의병 운동이 약해졌다는 생각을 고쳐 보았다", "1948년 8월 15일을 광복 날로 생각했던 것을 고쳤다"])
+    assert.equal(sv("revisit", ["a", bad, Q3]).ok, false, bad);
+  assert.ok(sv("revisit", ["a", "5·10 총선거로는 국회의원을 뽑았다", Q3]).ok);
+  assert.ok(sv("hold", ["a", "쌀이 늘어 살림이 넉넉했다고 생각했어요", Q3]).ok); // 보류에서는 학생 생각을 그대로 적을 수 있음
+});
+test("guard gives the reason so a retry can fix it", () => {
+  assert.match(sv("strong", ["a", "b", "c"]).reason, /물음표/);
+});

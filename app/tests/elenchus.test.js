@@ -197,3 +197,40 @@ test("misconception from a later lesson or old id form is dropped", async () => 
     assert.equal(s.getState().misconception, null, id);
   }
 });
+
+// ---- 세 줄 정리 (차시별 테스트 2026-11-24) ----
+test("retry tells the AI why the first answer was rejected", async () => {
+  const bad = { stage: "verdict", question: "", verdict: "revisit", summary: ["a", "처음에는 끝났다고 생각했다", "정전과 종전은 어떻게 다를까요?"] };
+  const { fake, s } = make([CHECK, bad, V("revisit")]);
+  await s.submitItems(three);
+  const st = await s.finishNow();
+  assert.equal(st.verdict, "revisit"); assert.equal(st.fallbacks, 0);
+  const second = fake.calls.at(-1).messages[0].content;
+  assert.ok(second.includes("검사에 걸렸") && second.includes("고친 생각"), "다시 물을 때 까닭이 없음");
+  assert.ok(!fake.calls.at(-2).messages[0].content.includes("검사에 걸렸"));
+});
+test("prompt: summary rules for each line", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("학생에게 보여 주는 글"), "3인칭 금지 규칙 없음");
+  assert.ok(p.includes("알게 된 것") && p.includes("오개념은 적지 않습니다"), "첫째 줄 규칙 없음");
+  assert.ok(p.includes("고친 생각 자체를"), "다시 볼 생각 둘째 줄 규칙 없음");
+  assert.ok(p.includes("생각을 바꾸지 않았으면"), "보류 둘째 줄 규칙 없음");
+});
+test("a too-long question is retried with the same request (no nudge toward a verdict)", async () => {
+  const longQ = Q("가".repeat(60) + "?");
+  const { fake, s } = make([CHECK, longQ, Q("정전은 끝낸 것일까요, 멈춘 것일까요?")]);
+  await s.submitItems(three);
+  await s.submitAnswer("정전 협정이요");
+  assert.equal(fake.calls[1].messages[0].content, fake.calls[2].messages[0].content);
+});
+test("summary retry asks to keep the verdict", async () => {
+  const bad = { stage: "verdict", question: "", verdict: "revisit", summary: ["a", "b", "c"] };
+  const { fake, s } = make([CHECK, bad, V("revisit")]);
+  await s.submitItems(three);
+  await s.finishNow();
+  assert.ok(fake.calls.at(-1).messages[0].content.includes("판정은 그대로"));
+});
+test("prompt: a student who only insists is hold, not revisit or strong", () => {
+  const rule = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith('- "hold"'));
+  assert.ok(rule && rule.includes("끝까지 고집") && rule.includes("스스로 고쳐 말했을 때만"));
+});

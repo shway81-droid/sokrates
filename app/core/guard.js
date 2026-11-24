@@ -31,13 +31,24 @@
     return { ok: true };
   }
 
-  function checkSummary(summary) {
+  const LABEL_PREFIX = /^(알게 된 것|다시 생각한 것|다음 시간 확인할 것)\s*[:：]/;
+  const THIRD_PERSON = /^학생(이|은|의|도|에게)\s/;
+  // 다시 볼 생각의 둘째 줄은 화면에 "고친 생각"으로 나가므로, 고친 과정이 아니라 고친 내용이어야 합니다.
+  const PROCESS_WORDS = /처음|고쳤|고쳐|생각했|헷갈렸/;
+
+  function checkSummary(summary, verdict) {
     if (!Array.isArray(summary) || summary.length !== 3) return "세 줄 정리가 3줄이 아님";
     for (const line of summary) {
       if (typeof line !== "string" || !line.trim()) return "세 줄 정리에 빈 줄";
-      if (charLen(line) > MAX_CHARS) return `세 줄 정리 한 줄이 ${MAX_CHARS}자를 넘음`;
-      if (hasForbidden(line)) return "세 줄 정리에 금지어 포함";
+      const t = line.trim();
+      if (charLen(t) > MAX_CHARS) return `세 줄 정리 한 줄이 ${MAX_CHARS}자를 넘음`;
+      if (hasForbidden(t)) return "세 줄 정리에 금지어 포함";
+      if (LABEL_PREFIX.test(t)) return "세 줄 정리 줄 앞에 칸 이름을 붙임";
+      if (THIRD_PERSON.test(t)) return "세 줄 정리를 '학생이'처럼 3인칭으로 씀(학생에게 보여 주는 글)";
     }
+    if (!summary[2].trim().endsWith("?")) return "셋째 줄(다음 시간 확인할 것)이 물음표로 끝나는 질문이 아님";
+    if (verdict === "revisit" && PROCESS_WORDS.test(summary[1]))
+      return "다시 볼 생각의 둘째 줄에 '처음에는', '고쳤다' 같은 과정 말이 있음 — 고친 생각 자체를 사실 문장으로 쓸 것";
     return null;
   }
 
@@ -62,7 +73,7 @@
     if (obj.stage === "question") return checkQuestion(obj.question);
     if (obj.stage === "verdict") {
       if (!VERDICTS.includes(obj.verdict)) return { ok: false, reason: "verdict 오류" };
-      const err = checkSummary(obj.summary);
+      const err = checkSummary(obj.summary, obj.verdict);
       return err ? { ok: false, reason: err } : { ok: true };
     }
     return { ok: false, reason: "알 수 없는 단계" };
