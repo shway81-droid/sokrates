@@ -44,12 +44,15 @@ test("synonyms do not equate a country with its army or reuse WWII 연합군", (
   assert.ok(!D.synonyms.some((g) => g.includes("연합군")));
 });
 
-// 교과서 원문(work/, git 제외)에 있는 25자 이상 연속 문자열을 그대로 옮기지 않았는지 검사합니다.
-const WORK = path.join(__dirname, "..", "..", "work", "625");
-test("no long verbatim", { skip: !fs.existsSync(WORK) && "work/625 없음" }, () => {
-  const norm = (s) => s.replace(/\s+/g, "");
-  const src = fs.readdirSync(WORK).filter((f) => f.endsWith(".txt"))
-    .map((f) => norm(fs.readFileSync(path.join(WORK, f), "utf8"))).join("|");
+// 교과서 원문(work/{단원}/{교과서}/*.txt, git 제외)에 있는 25자 이상 연속 문자열을 그대로 옮기지 않았는지 검사합니다.
+const WORK = path.join(__dirname, "..", "..", "work");
+const unitDirs = fs.existsSync(WORK) ? fs.readdirSync(WORK).filter((d) => /^\d+$/.test(d)).map((d) => path.join(WORK, d)) : [];
+test("no long verbatim", { skip: !unitDirs.length && "work/{단원} 없음" }, () => {
+  const norm = (s) => s.replace(/\s+/g, "").replace(/䞲/g, "·"); // 비상 PDF는 가운뎃점을 U+47B2로 뽑습니다
+  const txts = unitDirs.flatMap((u) => fs.readdirSync(u, { withFileTypes: true }).filter((d) => d.isDirectory() && d.name !== "png")
+    .flatMap((d) => fs.readdirSync(path.join(u, d.name)).filter((f) => f.endsWith(".txt")).map((f) => path.join(u, d.name, f))));
+  assert.ok(txts.length > 0, "원문 파일이 없음");
+  const src = txts.map((f) => norm(fs.readFileSync(f, "utf8"))).join("|");
   const N = 25;
   const texts = topics.flatMap((t) => [...t.concepts.map((c) => c.text), ...t.misconceptions.flatMap((m) => [m.wrong, m.truth])]);
   for (const t of texts) {
