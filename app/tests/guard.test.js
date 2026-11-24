@@ -1,0 +1,25 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const G = require("./load").load("core/guard.js");
+
+test("counts by code point", () => assert.equal(G.charLen(" 정전😀 "), 3));
+test("accepts short question", () => assert.ok(G.checkQuestion("정전은 전쟁을 끝낸 것일까요, 멈춘 것일까요?").ok));
+test("accepts exactly 40 chars", () => assert.ok(G.checkQuestion("가".repeat(39) + "?").ok));
+test("rejects 41 chars", () => assert.equal(G.checkQuestion("가".repeat(40) + "?").ok, false));
+test("rejects two sentences", () => assert.equal(G.checkQuestion("맞아요. 왜 그럴까요?").ok, false));
+test("rejects no question mark", () => assert.equal(G.checkQuestion("왜 그렇게 생각했나요").ok, false));
+test("rejects forbidden word", () => assert.equal(G.checkQuestion("정답은 무엇일까요?").ok, false));
+test("rejects non-string", () => assert.equal(G.checkQuestion(undefined).ok, false));
+test("default question passes own check", () => assert.ok(G.checkQuestion(G.DEFAULT_QUESTION).ok));
+test("check step valid", () => assert.ok(G.validateStep({stage:"check",checks:["ok","ok","think"],target:2,mode:"counter",question:"협정의 이름은 무엇이었나요?"},["check"]).ok));
+test("check step bad checks value", () => assert.equal(G.validateStep({stage:"check",checks:["ok","bad","ok"],target:0,mode:"reason",question:"왜 그럴까요?"},["check"]).ok,false));
+test("check step bad target", () => assert.equal(G.validateStep({stage:"check",checks:["ok","ok","ok"],target:3,mode:"reason",question:"왜 그럴까요?"},["check"]).ok,false));
+test("check step outside allowed", () => assert.ok(G.validateStep({stage:"check",checks:["outside","outside","outside"],target:0,mode:"retry",question:"오늘 배운 것 중 하나를 말해 볼까요?"},["check"]).ok));
+test("question step valid", () => assert.ok(G.validateStep({stage:"question",question:"왜 그럴까요?"},["question","verdict"]).ok));
+test("stage not allowed", () => assert.equal(G.validateStep({stage:"verdict",verdict:"hold",summary:["a","b","c"]},["question"]).ok,false));
+test("verdict needs 3 lines", () => assert.equal(G.validateStep({stage:"verdict",verdict:"strong",summary:["a","b"]},["verdict"]).ok,false));
+test("verdict line over 40", () => assert.equal(G.validateStep({stage:"verdict",verdict:"strong",summary:["a","b","가".repeat(41)]},["verdict"]).ok,false));
+test("verdict bad label", () => assert.equal(G.validateStep({stage:"verdict",verdict:"wrong",summary:["a","b","c"]},["verdict"]).ok,false));
+test("verdict valid", () => assert.ok(G.validateStep({stage:"verdict",verdict:"revisit",summary:["알게 된 것","다시 생각한 것","정전과 종전은 어떻게 다를까요?"]},["verdict"]).ok));
+test("default summary is valid verdict", () => assert.ok(G.validateStep({stage:"verdict",verdict:"hold",summary:G.DEFAULT_SUMMARY},["verdict"]).ok));
+test("null object rejected", () => assert.equal(G.validateStep(null,["check"]).ok,false));
