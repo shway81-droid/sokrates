@@ -40,7 +40,7 @@
     {
       name: "PRD 예시", ...at("chunjae", KEY625.chunjae, "6·25"),
       items: ["북한이 남침했다", "유엔군이 도와주었다", "전쟁은 1953년에 끝났다"],
-      answers: ["정전 협정이요.", "아, 멈춘 거예요. 그럼 끝난 건 아니네요."],
+      answers: ["아직 남북이 나뉘어 있어서요.", "아, 싸움만 멈춘 거네요. 그럼 끝난 건 아니네요."],
       expect: "revisit", expectChecks: ["ok", "ok", "think"],
     },
   ];
@@ -103,7 +103,27 @@
     expect: "hold", expectMode: "retry", expectChecks: ["ok", "ok", "outside"],
   });
 
-  const LiveCases = { cases };
+  // 실제 학생 같은 답(2026-11-24 엘렌코스 점검): 모범 답 대신 모른다, 고집한다, 되묻는다.
+  // 반례가 이름·숫자 퀴즈면 사실을 모르는 학생은 더 생각할 수 없으므로, 퀴즈형 질문은 "다름"으로 셉니다(live.html).
+  const REAL = "실제 학생 답";
+  const soldiers = ["북한이 남한을 쳐들어와서 전쟁이 시작되었다", "부산이 임시 수도였다", "전쟁에서 다치거나 죽은 사람은 군인뿐이었다"];
+  cases.push(
+    { name: "사실을 모르는 학생 · 천재교과서", ...at("chunjae", KEY625.chunjae, REAL),
+      items: ["북한이 남침했다", "유엔군이 도와주었다", "전쟁은 1953년에 끝났다"],
+      answers: ["잘 모르겠어요.", "음... 그냥 끝난 거 아니에요?", "몰라요."], expect: "hold", expectMode: "counter" },
+    { name: "막혀서 모르겠다는 학생 · 천재교과서", ...at("chunjae", KEY625.chunjae, REAL), items: soldiers,
+      answers: ["피란 가던 사람들도 다쳤을 것 같아요.", "어... 그럼 제가 말한 게 맞는지 잘 모르겠어요."], expect: "revisit", expectMode: "counter" },
+    { name: "까닭을 대며 고집하는 학생 · 천재교과서", ...at("chunjae", KEY625.chunjae, REAL), items: soldiers,
+      answers: ["아니요, 싸운 건 군인이니까 군인만 죽었어요.", "그래도 군인뿐이에요.", "제 말이 맞아요."], expect: "hold", expectMode: "counter" },
+    { name: "되묻는 학생 · 아이스크림미디어", ...at("icecream", KEY625.icecream, REAL),
+      items: ["북한이 남한을 쳐들어와서 전쟁이 시작되었다", "국제 연합군은 미국 군대 하나뿐이었다", "가족과 헤어진 이산가족이 생겼다"],
+      answers: ["미국이 제일 많이 왔어요.", "그럼 다른 나라도 왔어요?", "아, 그럼 여러 나라가 같이 왔겠네요."], expect: "revisit", expectMode: "counter" },
+  );
+
+  // 반례가 외운 이름·숫자를 맞히게 하는 퀴즈인지 가려냅니다.
+  const QUIZ = /이름은 무엇|이름이 무엇|무엇이라고 부를|부르는 말|몇 개|몇 나라|나라의 수|몇 년/;
+
+  const LiveCases = { cases, QUIZ };
   if (typeof module !== "undefined" && module.exports) module.exports = LiveCases;
   else root.SokLiveCases = LiveCases;
 })(this);

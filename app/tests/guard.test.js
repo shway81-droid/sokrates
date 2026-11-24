@@ -4,8 +4,8 @@ const G = require("./load").load("core/guard.js");
 
 test("counts by code point", () => assert.equal(G.charLen(" 정전😀 "), 3));
 test("accepts short question", () => assert.ok(G.checkQuestion("정전은 전쟁을 끝낸 것일까요, 멈춘 것일까요?").ok));
-test("accepts exactly 40 chars", () => assert.ok(G.checkQuestion("가".repeat(39) + "?").ok));
-test("rejects 41 chars", () => assert.equal(G.checkQuestion("가".repeat(40) + "?").ok, false));
+test("accepts exactly 40 chars", () => assert.ok(G.checkQuestion("가".repeat(38) + "요?").ok));
+test("rejects 41 chars", () => assert.equal(G.checkQuestion("가".repeat(39) + "요?").ok, false));
 test("rejects two sentences", () => assert.equal(G.checkQuestion("맞아요. 왜 그럴까요?").ok, false));
 test("rejects no question mark", () => assert.equal(G.checkQuestion("왜 그렇게 생각했나요").ok, false));
 test("rejects forbidden word", () => assert.equal(G.checkQuestion("정답은 무엇일까요?").ok, false));
@@ -77,4 +77,22 @@ test("summary may not use the word 반례", () => {
   const r = sv("hold", ["a", "반례를 받지 않아서 생각을 바꾼 것은 없어요", "임시 정부는 어떤 일을 했을까요?"]);
   assert.equal(r.ok, false);
   assert.ok(r.reason.includes("반례"), r.reason);
+});
+
+// 하이쿠 점검(2026-11-24): 질문이 길거나 반말("~했을까?")로 끝나는 일이 있어, 다시 낼 때 고칠 수 있게 까닭을 알려 줍니다.
+test("long question reason says how long, so a retry can shorten it", () => {
+  const r = G.checkQuestion("가".repeat(43) + "요?");
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes("45자") && r.reason.includes("짧게"), r.reason);
+});
+test("question must be a polite '~요?' question", () => {
+  const r = G.checkQuestion("휴전선은 왜 지금도 있을까?");
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes("존댓말"), r.reason);
+  assert.ok(G.checkQuestion("휴전선은 왜 지금도 있을까요?").ok);
+});
+test("third summary line must be a polite '~요?' question", () => {
+  const r = G.validateStep({ stage: "verdict", verdict: "revisit", summary: ["가", "나", "임시 정부는 어떤 일을 했을까?"] }, ["verdict"]);
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes("존댓말"), r.reason);
 });

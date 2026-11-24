@@ -23,6 +23,21 @@ for (const t of topics) {
   });
   test(`${t.id}: three textbooks`, () => assert.deepEqual(t.textbooks.map((x) => x.id), ["chunjae", "icecream", "visang"]));
 }
+// 반례 실마리는 AI가 쓸 반례 질문의 예이자 선생님 도움말의 "이어서 물어볼 것"입니다.
+// 이름·숫자를 맞히는 퀴즈가 아니라, 학생 말을 따라가 생각해 보게 하는 짧은 질문으로 씁니다(엘렌코스, 2026-11-24).
+const QUIZ = /이름은 무엇|이름이 무엇|무엇이라고 부를|부르는 말|몇 개|몇 나라|나라의 수|걸린 날|몇 년/;
+for (const t of topics) {
+  test(`${t.id}: counter hints are short questions, not quizzes`, () => {
+    for (const m of t.misconceptions) {
+      assert.ok(m.counterHints.length >= 2, `${m.id} 실마리가 2개보다 적음`);
+      for (const h of m.counterHints) {
+        assert.ok(h.endsWith("?"), `${m.id} 질문이 아님: ${h}`);
+        assert.ok(Array.from(h).length <= 40, `${m.id} 40자를 넘음: ${h}`);
+        assert.ok(!QUIZ.test(h), `${m.id} 퀴즈형: ${h}`);
+      }
+    }
+  });
+}
 test("units list topics in order", () => assert.deepEqual(units.find((u) => u.id === 3).topics, ["3-1", "3-2"]));
 
 // 2026-11-24 교과서 원문 대조 검증을 마친 6·25 내용이 옮기면서 바뀌지 않았는지 확인합니다.

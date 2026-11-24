@@ -12,7 +12,7 @@
 
 규칙:
 1. 반례는 [반례에 쓸 수 있는 범위]에 있는 개념과 오개념 안에서만 만듭니다. 근거가 없으면 반례 대신 "왜 그렇게 생각했나요?"라고 묻습니다. 반례는 [흔한 오개념(오늘 차시)]에서 먼저 고르고, [흔한 오개념(앞 차시)]는 학생이 그 내용을 말했을 때만 씁니다.
-2. 정답이나 설명을 말하지 않습니다. 질문은 1문장, 40자 이내, 물음표(?)로 끝냅니다. 질문 안에 마침표나 느낌표를 넣지 않습니다.
+2. 정답이나 설명을 말하지 않습니다. 질문은 1문장, 30자 안팎으로 짧게(40자를 넘으면 안 됩니다) 쓰고, "~까요?", "~나요?"처럼 "요?"로 끝나는 존댓말로 냅니다. 질문 안에 마침표나 느낌표를 넣지 않습니다. 앞에서 한 질문을 되풀이하지 않습니다.
 3. 5학년이 아는 쉬운 낱말과 존댓말을 씁니다.
 4. 맞는 지식에는 반례를 던지지 않습니다. 반례는 target 1개에만 씁니다.
 5. [같은 뜻으로 인정할 말]에 있는 표현은 같은 말로 봅니다. 맞춤법과 띄어쓰기는 문제 삼지 않습니다.
@@ -36,7 +36,18 @@
 - misconception: target이 [반례에 쓸 수 있는 범위]의 흔한 오개념에 해당하면 그 id(예: "3-2.m01"), 아니면 "none"
 - question: 첫 질문
 
+[반례 질문 만드는 법] (mode "counter")
+- 반례는 checks에서 이미 "think"로 정한 항목에만 씁니다. 반례 질문을 만들 수 있다고 해서 "think"로 정하지 않습니다. "think"인지는 위 내용 확인의 기준으로만 정합니다.
+- 반례는 퀴즈가 아닙니다. 협정 이름, 나라 수, 연도, 낱말 뜻처럼 외운 것을 맞히게 하는 질문("~의 이름은 무엇일까요?", "몇 개였을까요?")은 쓰지 않습니다. 그 사실을 모르는 학생은 더 생각해 볼 수 없기 때문입니다.
+- 첫 질문: 학생 말이 맞다면 어떻게 되는지 묻거나, 학생이 상식이나 오늘 배운 것으로 쉽게 답할 수 있는 것을 묻습니다(예: "다친 사람은 군인뿐이었다" → "전쟁이 난 곳에는 군인만 살고 있었을까요?").
+- 다음 질문: 학생이 인정한 말을 학생이 처음 한 말과 나란히 놓아, 둘이 함께 맞을 수 있는지 묻습니다(예: "마을에서 싸움이 벌어지면 누가 다쳤을까요?"). 결론은 학생이 스스로 말하게 합니다.
+- 학생이 까닭을 대면(예: "싸운 건 군인이니까요") 같은 것을 다시 묻지 말고 그 까닭을 시험하는 질문을 합니다(예: "싸우지 않은 사람은 전쟁에서 다치지 않을까요?").
+- 학생이 "모르겠어요"라고 하면 같은 것을 다시 묻지 말고, 그 사실을 몰라도 답할 수 있는 더 쉬운 질문으로 바꿉니다.
+- 오개념의 "반례 실마리"는 이렇게 만든 질문의 예입니다. 그대로 쓰거나 학생 말에 맞게 바꿉니다.
+- 질문이 기대는 사실은 교과서 범위 안이어야 합니다. 다만 "마을에는 사람이 산다"처럼 5학년이면 다 아는 상식으로 따져 보게 하는 것은 괜찮습니다.
+
 판정(stage "verdict"):
+- 질문이 남아 있는데 학생이 되물으면(예: "다른 나라도 왔어요?") 판정하지 말고 질문을 이어 갑니다. 답을 알려 주지 말고 학생이 스스로 답을 찾게 하는 질문으로 돌려줍니다.
 - "strong"(튼튼한 생각): 학생이 반례에도 교과서 근거를 대며 생각을 지켰거나, 이유를 근거 있게 설명했습니다.
 - "revisit"(다시 볼 생각): 학생이 "그러면 아닌가?"처럼 스스로 허점을 인정했습니다. 학생이 처음 말한 대상 항목을 고쳐 말하면(예: "아, 군인만이 아니었네요") 근거를 함께 말했더라도 "strong"이 아니라 "revisit"입니다.
 - "hold"(판정 보류): 어느 쪽도 아니거나, 끝까지 오늘 주제와 관계있는 내용이 나오지 않았습니다. 학생이 근거 없이 "제 말이 맞아요"처럼 처음 생각을 끝까지 고집하면, 그 생각이 다시 봐야 할 생각이더라도 "revisit"이나 "strong"이 아니라 "hold"입니다("revisit"은 학생이 스스로 고쳐 말했을 때만 줍니다).
@@ -45,7 +56,7 @@
 
 [세 줄 정리 쓰는 법]
 - 학생에게 보여 주는 글입니다. "학생이", "학생은" 같은 3인칭과 "반례" 같은 어려운 말을 쓰지 않고, 줄 앞에 칸 이름(예: "알게 된 것:")을 붙이지 않습니다.
-- 첫째 줄 "알게 된 것": 학생이 문답이나 배운 3가지에서 맞게 말한 교과서 내용만 적습니다. 학생이 하지 않은 말을 보태지 않고, 오개념은 적지 않습니다. 그런 내용이 없으면 "오늘 배운 내용을 아직 말로 꺼내지 못했어요"처럼 씁니다.
+- 첫째 줄 "알게 된 것": 학생이 문답이나 배운 3가지에서 맞게 말한 교과서 내용만 적습니다. 학생이 하지 않은 말을 보태지 않고, 오개념은 적지 않습니다. 판정 보류일 때는 학생이 끝까지 고치지 않은 대상 항목의 바른 내용(예: "민간인도 많이 다쳤다")을 적지 않습니다. 그런 내용이 없으면 "오늘 배운 내용을 아직 말로 꺼내지 못했어요"처럼 씁니다.
 - 둘째 줄 "다시 생각한 것":
   · 다시 볼 생각(revisit): 학생이 고쳐 말한 고친 생각 자체를 사실 문장으로 씁니다. "처음에는", "고쳤다", "생각했다" 같은 말은 쓰지 않습니다(예: "처음에는 대통령 선거라고 생각했다"가 아니라 "5·10 총선거로는 국회의원을 뽑았다").
   · 판정 보류(hold)에서 학생이 생각을 바꾸지 않았으면, 학생이 말한 생각을 그대로 "~라고 생각했어요"로 적습니다. 학생이 깨닫지 않은 바른 생각을 학생이 깨달은 것처럼 적지 않습니다.
@@ -55,9 +66,9 @@
 
 예시(천재교과서):
 학생: ① 북한이 남침했다 ② 유엔군이 도와주었다 ③ 전쟁은 1953년에 끝났다
-확인: checks ["ok","ok","think"], target 2, mode "counter", misconception "3-2.m01", question "1953년에 맺은 협정의 이름은 무엇이었나요?"
-학생 답: 정전 협정이요. → 다음 질문: "정전은 전쟁을 끝낸 것일까요, 멈춘 것일까요?"
-학생 답: 아, 멈춘 거예요. 그럼 끝난 건 아니네요. → 판정 "revisit", summary { learned: "북한의 남침과 국제 연합군의 참전", rethought: "1953년에 전쟁이 끝난 게 아니라 멈췄다", nextQuestion: "정전과 종전은 어떻게 다를까요?" }`;
+확인: checks ["ok","ok","think"], target 2, mode "counter", misconception "3-2.m01", question "전쟁이 끝났다면 왜 지금도 휴전선이 있을까요?"
+학생 답: 아직 남북이 나뉘어 있어서요. → 다음 질문: "아직 나뉘어 있다면 1953년에 전쟁이 끝난 것일까요?"
+학생 답: 아, 싸움만 멈춘 거네요. 그럼 끝난 건 아니네요. → 판정 "revisit", summary { learned: "북한의 남침과 국제 연합군의 참전", rethought: "1953년에 전쟁이 끝난 게 아니라 멈췄다", nextQuestion: "정전과 종전은 어떻게 다를까요?" }`;
 
   const STR = { type: "string" };
   // 세 줄 정리는 칸마다 이름을 붙여 받습니다. 배열 자리로만 받으면 AI가 학생이 말한 3가지를
@@ -65,9 +76,9 @@
   const SUMMARY = {
     type: "object",
     properties: {
-      learned: { type: "string", description: "알게 된 것: 학생이 맞게 말한 교과서 내용 1문장" },
-      rethought: { type: "string", description: "다시 생각한 것: 고친 생각, 끝까지 지킨 생각, 또는 학생이 댄 근거 1문장" },
-      nextQuestion: { type: "string", description: "다음 시간 확인할 것: 물음표(?)로 끝나는 질문 1개" },
+      learned: { type: "string", description: "알게 된 것: 학생이 맞게 말한 교과서 내용 1문장, 30자 안팎(40자를 넘으면 안 됨)" },
+      rethought: { type: "string", description: "다시 생각한 것: 고친 생각, 끝까지 지킨 생각, 또는 학생이 댄 근거 1문장, 30자 안팎(40자를 넘으면 안 됨)" },
+      nextQuestion: { type: "string", description: "다음 시간 확인할 것: 물음표로 끝나는 존댓말 질문 1개(\"~까요?\"처럼 요?로 끝남), 30자 안팎(40자를 넘으면 안 됨)" },
     },
     required: ["learned", "rethought", "nextQuestion"],
     additionalProperties: false,
@@ -110,7 +121,13 @@
     },
   };
 
-  const MODE_TEXT = { counter: "반례로 묻기", reason: "이유 묻기", retry: "다시 말해 보게 하기" };
+  // 질문이 검사에 걸려 다시 받을 때 쓰는 형식: 질문만 낼 수 있습니다(판정으로 넘어가지 못하게).
+  SCHEMAS.question = {
+    ...SCHEMAS.next,
+    properties: { ...SCHEMAS.next.properties, stage: { type: "string", enum: ["question"] }, verdict: { type: "string", enum: ["none"] } },
+  };
+
+  const MODE_TEXT ={ counter: "반례로 묻기", reason: "이유 묻기", retry: "다시 말해 보게 하기" };
 
   // 이름 붙은 세 칸을 화면과 검사가 쓰는 세 줄 배열로 바꿉니다.
   function toLines(out) {
@@ -169,19 +186,38 @@ ${text}`, cache_control: { type: "ephemeral" } },
       ];
     }
 
-    // AI를 부르고 검사합니다. 검사에 두 번 걸리면 null을 돌려줍니다. AI 오류는 그대로 throw합니다.
+    // 앞에서 한 질문을 그대로 되풀이하면 문답이 나아가지 않습니다(띄어쓰기만 다른 것도 같은 질문으로 봅니다).
+    const squash = (q) => String(q).replace(/\s+/g, "");
+    function checkStep(out, allowedStages) {
+      const v = G.validateStep(out, allowedStages);
+      if (v.ok && out.stage === "question" && state.turns.some((t) => squash(t.q) === squash(out.question)))
+        return { ok: false, reason: "앞에서 한 질문과 같음 — 학생의 마지막 답에 맞춰 다른 질문을 낼 것" };
+      return v;
+    }
+
+    // AI를 부르고 검사합니다. 검사에 걸리면 까닭을 알려 주고 다시 받습니다(질문은 두 번, 세 줄 정리는 세 번까지).
+    // 그래도 걸리면 null을 돌려줍니다. AI 오류는 그대로 throw합니다.
     async function callChecked(task, schema, allowedStages) {
       const gen = generation;
       let content = buildMessage(task);
-      for (let attempt = 0; attempt < 2; attempt++) {
+      for (let attempt = 1; ; attempt++) {
         const out = toLines(await llm.call({ system, messages: [{ role: "user", content }], schema }));
         if (gen !== generation) throw CANCELLED; // 기다리는 동안 [다음 학생]을 눌렀으면 결과를 버립니다
-        const v = G.validateStep(out, allowedStages);
+        const v = checkStep(out, allowedStages);
         if (v.ok) return out;
-        // 세 줄 정리가 걸렸을 때만 까닭을 알려 줍니다. 질문이 걸렸을 때 까닭을 알리면
-        // AI가 질문 대신 판정으로 넘어가 버리는 일이 있어(차시별 테스트), 그때는 같은 요청을 다시 보냅니다.
-        if (out && out.stage === "verdict")
+        const stage = out && out.stage;
+        if (attempt >= (stage === "verdict" ? 3 : 2)) break;
+        if (stage === "verdict") {
           content = buildMessage(task, `[앞 응답이 검사에 걸렸어요: ${v.reason}] 판정은 그대로 두고 이 점만 고쳐 다시 내세요.`);
+        } else if (stage === "question") {
+          // 질문이 걸렸을 때 까닭만 알리면 AI가 질문 대신 판정으로 넘어가 버리는 일이 있어(차시별 테스트),
+          // 다시 낼 때는 질문만 낼 수 있는 형식으로 받습니다.
+          content = buildMessage(task, `[앞 응답의 질문이 검사에 걸렸어요: ${v.reason}] 질문만 고쳐 다시 내세요.`);
+          schema = SCHEMAS.question;
+          allowedStages = ["question"];
+        } else if (stage === "check") {
+          content = buildMessage(task, `[앞 응답이 검사에 걸렸어요: ${v.reason}] 이 점만 고쳐 다시 내세요.`);
+        }
       }
       state.fallbacks++;
       return null;

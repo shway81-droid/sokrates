@@ -62,7 +62,7 @@
   const L = window.SokLLM, G = window.SokGuard, E = window.SokElenchus;
   const C = window.SokCatalog;
   const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
-  const cases = window.SokLiveCases.cases;
+  const cases = window.SokLiveCases.cases, QUIZ = window.SokLiveCases.QUIZ;
   const settings = L.loadSettings();
   const $ = (id) => document.getElementById(id);
   const results = [];
@@ -97,8 +97,10 @@
     const checksOk = (!c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks))
       && (!c.expectOk || (st.checks && c.expectOk.every((i) => st.checks[i] === "ok"))); // 지난 차시 내용을 섞은 항목은 "ok"여야 합니다
     // 검사에 걸려 기본값으로 대신한 적이 있으면 프롬프트가 제대로 작동하지 않은 것이므로 "다름"으로 셉니다.
-    const same = st.phase === "done" && st.verdict === c.expect && checksOk && st.fallbacks === 0;
-    return { c, st, asked, calls, ms, same, checksOk, cause };
+    // 반례가 이름·숫자 퀴즈면 엘렌코스가 아니므로 "다름"으로 셉니다.
+    const quiz = st.mode === "counter" ? asked.filter((q) => QUIZ.test(q)).length : 0;
+    const same = st.phase === "done" && st.verdict === c.expect && checksOk && st.fallbacks === 0 && quiz === 0;
+    return { c, st, asked, calls, ms, same, checksOk, cause, quiz };
   }
 
   const expectText = (c) => c.expect + (c.expectChecks ? ` (${c.expectChecks.join("/")})` : "") + (c.expectOk ? ` · ${c.expectOk.map((i) => i + 1).join(",")}번 ok` : "");
@@ -109,7 +111,7 @@
     const qs = document.createElement("td");
     r.asked.forEach((q) => {
       const len = G.charLen(q);
-      const p = document.createElement("p"); p.className = "q" + (len > G.MAX_CHARS ? " long" : "");
+      const p = document.createElement("p"); p.className = "q" + (len > G.MAX_CHARS || (r.st.mode === "counter" && QUIZ.test(q)) ? " long" : "");
       const num = document.createElement("span"); num.className = "n"; num.textContent = ` (${len})`;
       p.append(document.createTextNode(q), num); qs.append(p);
     });
@@ -134,11 +136,12 @@
     const same = results.filter((r) => r.same).length;
     const long = results.flatMap((r) => r.asked).filter((q) => G.charLen(q) > G.MAX_CHARS).length;
     const fb = results.reduce((n, r) => n + r.st.fallbacks, 0);
+    const quiz = results.reduce((n, r) => n + r.quiz, 0);
     const groups = [...new Set(results.map((r) => r.c.group))].map((g) => {
       const rs = results.filter((r) => r.c.group === g);
       return `${g} ${rs.filter((r) => r.same).length}/${rs.length}`;
     }).join(" · ");
-    return `판정 일치 ${same}/${results.length} (${groups}) · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번`;
+    return `판정 일치 ${same}/${results.length} (${groups}) · 40자 넘는 질문 ${long}개 · 퀴즈형 반례 ${quiz}개 · 기본값 대체 ${fb}번`;
   }
 
   $("run").addEventListener("click", async () => {

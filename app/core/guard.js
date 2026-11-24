@@ -21,11 +21,16 @@
     return FORBIDDEN.some((w) => s.includes(w));
   }
 
+  // 학생에게 하는 질문은 존댓말입니다. "~했을까?" 같은 반말 질문을 막습니다.
+  const POLITE_Q = /요\s*\?$/;
+
   function checkQuestion(q) {
     if (typeof q !== "string" || !q.trim()) return { ok: false, reason: "질문이 비어 있음" };
     const t = q.trim();
-    if (charLen(t) > MAX_CHARS) return { ok: false, reason: `질문이 ${MAX_CHARS}자를 넘음` };
+    // 다시 낼 때 고칠 수 있게 몇 자인지 알려 줍니다.
+    if (charLen(t) > MAX_CHARS) return { ok: false, reason: `질문이 ${charLen(t)}자로 ${MAX_CHARS}자를 넘음 — 30자 안팎으로 더 짧게 줄일 것` };
     if (!t.endsWith("?")) return { ok: false, reason: "물음표로 끝나지 않음" };
+    if (!POLITE_Q.test(t)) return { ok: false, reason: "존댓말 질문이 아님 — '~까요?', '~나요?'처럼 '요?'로 끝낼 것" };
     if (/[.?!]/.test(t.slice(0, -1))) return { ok: false, reason: "한 문장이 아님" };
     if (hasForbidden(t)) return { ok: false, reason: "금지어 포함" };
     return { ok: true };
@@ -49,6 +54,7 @@
       if (THIRD_PERSON.test(t)) return "세 줄 정리를 '학생이'처럼 3인칭으로 씀(학생에게 보여 주는 글)";
     }
     if (!summary[2].trim().endsWith("?")) return "셋째 줄(다음 시간 확인할 것)이 물음표로 끝나는 질문이 아님";
+    if (!POLITE_Q.test(summary[2].trim())) return "셋째 줄이 존댓말 질문이 아님 — '~까요?'처럼 '요?'로 끝낼 것";
     if (verdict === "revisit" && PROCESS_WORDS.test(summary[1]))
       return "다시 볼 생각의 둘째 줄에 '처음에는', '고쳤다' 같은 과정 말이 있음 — 고친 생각 자체를 사실 문장으로 쓸 것";
     return null;

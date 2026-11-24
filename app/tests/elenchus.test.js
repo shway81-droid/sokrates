@@ -83,7 +83,7 @@ test("guard fail then success uses second", async () => {
 });
 test("guard fail on verdict falls back to hold", async () => {
   const badV = { stage: "verdict", question: "", verdict: "strong", summary: ["하나", "둘"] };
-  const { s } = make([REASON, Q("무엇 때문이었을까요?"), badV, badV]);
+  const { s } = make([REASON, Q("무엇 때문이었을까요?"), badV, badV, badV]); // 세 줄 정리는 세 번까지 냅니다
   await s.submitItems(three);
   await s.submitAnswer("이유");
   const st = await s.submitAnswer("근거"); // 이유 묻기는 두 번째 답 뒤에 반드시 판정합니다
@@ -217,12 +217,41 @@ test("prompt: summary rules for each line", () => {
   assert.ok(p.includes("고친 생각 자체를"), "다시 볼 생각 둘째 줄 규칙 없음");
   assert.ok(p.includes("생각을 바꾸지 않았으면"), "보류 둘째 줄 규칙 없음");
 });
-test("a too-long question is retried with the same request (no nudge toward a verdict)", async () => {
-  const longQ = Q("가".repeat(60) + "?");
+// 엘렌코스 질문은 길어지기 쉬워, 같은 요청만 다시 보내면 두 번 다 걸려 기본 질문으로 문답이 끊겼습니다(하이쿠 점검).
+// 까닭을 알려 주되, 다시 낼 때는 질문만 낼 수 있게 해서 판정으로 넘어가지 못하게 합니다.
+test("a failed question is retried with its reason, and the retry can only be a question", async () => {
+  const longQ = Q("가".repeat(60) + "요?");
   const { fake, s } = make([CHECK, longQ, Q("정전은 끝낸 것일까요, 멈춘 것일까요?")]);
   await s.submitItems(three);
-  await s.submitAnswer("정전 협정이요");
-  assert.deepEqual(fake.calls[1].messages[0].content, fake.calls[2].messages[0].content);
+  const st = await s.submitAnswer("정전 협정이요");
+  assert.equal(st.question, "정전은 끝낸 것일까요, 멈춘 것일까요?");
+  const retry = msgText(fake.calls[2]);
+  assert.ok(retry.includes("검사에 걸렸") && retry.includes("62자"), retry);
+  assert.deepEqual(fake.calls[2].schema.properties.stage.enum, ["question"]);
+  assert.deepEqual(fake.calls[1].schema.properties.stage.enum, ["question", "verdict"], "첫 요청은 판정도 낼 수 있음");
+});
+test("a failed first question in the check step is retried with its reason", async () => {
+  const bad = { ...CHECK, question: "휴전선은 왜 지금도 있을까?" };
+  const { fake, s } = make([bad, CHECK]);
+  const st = await s.submitItems(three);
+  assert.equal(st.question, CHECK.question);
+  assert.ok(msgText(fake.calls[1]).includes("존댓말"), msgText(fake.calls[1]));
+  assert.equal(fake.calls[1].schema, E.SCHEMAS.check);
+});
+test("a question that repeats an earlier one is retried", async () => {
+  const { fake, s } = make([CHECK, Q(CHECK.question), Q("휴전선은 왜 지금도 있을까요?")]);
+  await s.submitItems(three);
+  const st = await s.submitAnswer("모르겠어요");
+  assert.equal(st.question, "휴전선은 왜 지금도 있을까요?");
+  assert.ok(msgText(fake.calls[2]).includes("앞에서 한 질문"), msgText(fake.calls[2]));
+  assert.equal(st.fallbacks, 0);
+});
+test("a summary that fails twice gets a third try before falling back", async () => {
+  const bad = { stage: "verdict", question: "", verdict: "revisit", summary: ["가".repeat(45), "b", "다음에 무엇을 볼까요?"] };
+  const { fake, s } = make([CHECK, bad, bad, V("revisit")]);
+  await s.submitItems(three);
+  const st = await s.finishNow();
+  assert.equal(st.verdict, "revisit"); assert.equal(st.fallbacks, 0); assert.equal(fake.calls.length, 4);
 });
 test("summary retry asks to keep the verdict", async () => {
   const bad = { stage: "verdict", question: "", verdict: "revisit", summary: ["a", "b", "c"] };
@@ -319,4 +348,54 @@ test("unit context is the cached first block of the message", async () => {
   assert.ok(!rest.text.includes("[반례에 쓸 수 있는 범위") && rest.text.includes(three[2]));
   assert.equal(rest.cache_control, undefined);
   assert.ok(fake.calls.every((c) => JSON.stringify(c.messages[0].content[0]) === JSON.stringify(ctx)), "모든 호출에서 같은 캐시 블록");
+});
+
+// ---- 엘렌코스다운 반례 (2026-11-24) ----
+// 반례는 이름·숫자를 맞히는 퀴즈가 아니라, 학생 말을 따라가 그 말이 앞뒤가 안 맞는다는 것을 스스로 보게 하는 질문입니다.
+test("prompt: counter questions are not name or number quizzes", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("[반례 질문 만드는 법]"));
+  assert.ok(p.includes("퀴즈가 아닙니다"));
+});
+test("prompt: the next question sets what the student admitted beside the first claim", () => {
+  assert.ok(E.SYSTEM_PROMPT.includes("처음 한 말과 나란히"));
+});
+test("prompt: a reason the student gives is tested next", () => {
+  assert.ok(E.SYSTEM_PROMPT.includes("그 까닭을 시험하는 질문"));
+});
+test("prompt: after 'I don't know' ask something answerable without that fact", () => {
+  assert.ok(E.SYSTEM_PROMPT.includes("몰라도 답할 수 있는"));
+});
+test("prompt: keep asking while the student asks back", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("되물으면"));
+  assert.ok(p.includes("판정하지 말고 질문을 이어"));
+});
+test("prompt example does not open with a name quiz", () => {
+  assert.ok(!E.SYSTEM_PROMPT.includes("협정의 이름은"));
+});
+
+// ---- 하이쿠 점검에서 남은 문제 (2026-11-24) ----
+test("prompt: questions are short polite '~요?' questions and never repeated", () => {
+  const rule = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith("2. "));
+  assert.ok(rule.includes("30자 안팎"), rule);
+  assert.ok(rule.includes("요?"), rule);
+  assert.ok(rule.includes("되풀이하지"), rule);
+});
+test("prompt: on hold, the first line does not slip in what the student never said", () => {
+  const first = E.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith("- 첫째 줄"));
+  assert.ok(first.includes("판정 보류일 때"), first);
+});
+test("summary schema descriptions ask for about 30 characters", () => {
+  const p = E.SCHEMAS.verdict.properties.summary.properties;
+  for (const k of ["learned", "rethought", "nextQuestion"]) assert.ok(p[k].description.includes("30자 안팎"), k);
+  assert.ok(p.nextQuestion.description.includes("요?"));
+});
+// 반례 만드는 법을 넣자 AI가 반례를 쓸 곳을 찾으려고 맞는 말까지 think로 정하는 일이 생겼습니다
+// (소넷 4/4: "31운동을 통해 임시정부가 세워졌다"). think는 내용 확인 기준으로만 정합니다.
+test("prompt: being able to build a counter question is no reason to mark think", () => {
+  const p = E.SYSTEM_PROMPT;
+  const start = p.indexOf("[반례 질문 만드는 법]");
+  const firstRule = p.slice(start).split(/\r?\n/)[1];
+  assert.ok(firstRule.includes('이미 "think"로 정한 항목에만'), firstRule);
 });
