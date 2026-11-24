@@ -34,20 +34,26 @@
     return lines.join("\n");
   }
 
-  const lessonText = (l) => { const [u, c] = String(l).split("-"); return `${u}단원 ${c}차시`; };
+  const unitOf = (lessonId) => String(lessonId).split("-")[0];
+  const lessonText = (l) => `${unitOf(l.id)}단원 ${l.no}차시`; // { id: "3-10", no: "10~11" } → "3단원 10~11차시"
 
-  // 판정 보류·다시 볼 생각일 때 선생님이 이어서 짚어 줄 것: 교과서 내용, 펼쳐 볼 쪽, 이어서 물어볼 것
-  function teacherHelp(topic, textbookId, state) {
+  // 판정 보류·다시 볼 생각일 때 선생님이 이어서 짚어 줄 것: 교과서 내용, 펼쳐 볼 곳, 이어서 물어볼 것
+  // lessonId: 오늘 차시(단원 마무리면 null). 오개념을 못 찾으면 오늘 차시나 차시 목록을 가리킵니다.
+  function teacherHelp(topic, textbookId, state, lessonId = null) {
     if (!state || (state.verdict !== "hold" && state.verdict !== "revisit")) return null;
     const tb = topic.textbooks.find((t) => t.id === textbookId);
     if (!tb) return null;
+    const findLesson = (id) => tb.lessons.find((l) => l.id === id);
     const item = state.target != null && state.items ? state.items[state.target] || null : null;
     const m = state.misconception && topic.misconceptions.find((x) => x.id === state.misconception);
     const src = m && m.sources[textbookId];
-    if (m && src) {
-      return { item, truth: m.truth, where: `${tb.name} ${lessonText(src.lesson)} ${src.page}쪽`, hints: m.counterHints.slice() };
+    const lesson = src && findLesson(src.lesson);
+    if (m && lesson) {
+      return { item, truth: m.truth, where: `${tb.name} ${lessonText(lesson)} ${lesson.title} ${src.page}쪽`, hints: m.counterHints.slice() };
     }
-    return { item, truth: null, where: `${tb.name} ${tb.lessons.join(", ")}`, hints: [] };
+    const today = lessonId != null && findLesson(lessonId);
+    const where = today ? `${tb.name} ${lessonText(today)} ${today.title}` : `${tb.name} ${tb.lessons.map(lessonText).join(", ")}`;
+    return { item, truth: null, where, hints: [] };
   }
 
   // el("div", {class: "x", onclick: fn}, [자식...]) — 글자는 textContent로만 넣어 HTML 주입을 막습니다.

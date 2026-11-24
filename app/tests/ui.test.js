@@ -37,13 +37,18 @@ test("teacher help: textbook truth, page and hints for the chosen textbook", () 
   const h = U.teacherHelp(D, "chunjae", doneState({}));
   assert.equal(h.item, "전쟁은 1953년에 끝났다");
   assert.equal(h.truth, D.misconceptions[0].truth);
-  assert.equal(h.where, "천재교과서 3단원 11차시 151쪽");
+  assert.equal(h.where, "천재교과서 3단원 11차시 6·25 전쟁으로 사람들이 겪은 어려움 살펴보기 151쪽");
   assert.deepEqual(h.hints, D.misconceptions[0].counterHints);
-  assert.equal(U.teacherHelp(D, "visang", doneState({ verdict: "revisit" })).where, "비상교육 3단원 11차시 142쪽");
+  assert.equal(U.teacherHelp(D, "visang", doneState({ verdict: "revisit" })).where, "비상교육 3단원 11~12차시 6·25 전쟁의 과정과 영향을 알아볼까요 142쪽");
 });
 test("teacher help: without a misconception, point to the textbook lessons", () => {
   const h = U.teacherHelp(D, "chunjae", doneState({ misconception: null, mode: "retry", checks: ["think", "think", "outside"], target: 0 }));
   assert.equal(h.truth, null);
-  assert.ok(h.where.startsWith("천재교과서 3단원 11차시"));
+  assert.equal(h.where, "천재교과서 3단원 11차시, 3단원 12차시");
   assert.deepEqual(h.hints, []);
+});
+test("teacher help: no misconception points to today's lesson", () => {
+  const h = U.teacherHelp(D, "icecream", doneState({ misconception: null }), "3-12");
+  assert.equal(h.where, "아이스크림미디어 3단원 12차시 6·25 전쟁 이후 달라진 사회와 사람들의 생활 모습을 알아볼까요");
+  assert.equal(h.truth, null);
 });
