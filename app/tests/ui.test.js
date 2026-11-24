@@ -44,7 +44,7 @@ test("teacher help: textbook truth, page and hints for the chosen textbook", () 
 test("teacher help: without a misconception, point to the textbook lessons", () => {
   const h = U.teacherHelp(D, "chunjae", doneState({ misconception: null, mode: "retry", checks: ["think", "think", "outside"], target: 0 }));
   assert.equal(h.truth, null);
-  assert.equal(h.where, "천재교과서 3단원 11차시, 3단원 12차시");
+  assert.equal(h.where, "천재교과서 3단원 8~9차시, 3단원 10차시, 3단원 11차시, 3단원 12차시");
   assert.deepEqual(h.hints, []);
 });
 test("teacher help: no misconception points to today's lesson", () => {
