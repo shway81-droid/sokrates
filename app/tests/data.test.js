@@ -12,11 +12,8 @@ test("concept count 15~25", () => assert.ok(D.concepts.length >= 15 && D.concept
 test("misconception count 6~10", () => assert.ok(D.misconceptions.length >= 6 && D.misconceptions.length <= 10, String(D.misconceptions.length)));
 test("PRD example present", () => assert.ok(D.misconceptions.some((m) => /1953/.test(m.wrong) && /정전/.test(m.truth))));
 test("synonym 국제 연합군", () => assert.ok(D.synonyms.some((g) => g.includes("국제 연합군") && g.includes("유엔군"))));
-// 2026-11-24 교과서 원문 대조 검증 반영: m01만 선생님 판단을 기다립니다.
-test("only m01 awaits the teacher after verification", () => {
-  assert.equal(T.unreviewedCount(D), 1);
-  assert.equal(D.misconceptions.find((m) => !m.reviewed).id, "m01");
-});
+// 2026-11-24 교과서 원문 대조 검증 + m01은 선생님이 그대로 두기로 정함
+test("all misconceptions reviewed", () => assert.equal(T.unreviewedCount(D), 0));
 test("synonyms do not equate a country with its army or reuse WWII 연합군", () => {
   const army = D.synonyms.find((g) => g.includes("북한군"));
   assert.ok(!army.includes("북한"));
