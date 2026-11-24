@@ -5,8 +5,8 @@ module.exports = {
   grade: "5-2",
   subject: "사회",
   textbooks: [
-    { id: "a", name: "교과서A", lessons: ["3단원 1차시"] },
-    { id: "b", name: "교과서B", lessons: ["3단원 2차시"] },
+    { id: "a", name: "교과서A", lessons: [{ id: "3-1", no: "1", title: "차시 하나", pages: "10~11" }] },
+    { id: "b", name: "교과서B", lessons: [{ id: "3-2", no: "2", title: "차시 둘", pages: "20~21" }] },
   ],
   concepts: [
     { id: "c1", text: "개념 하나", sources: { a: { lesson: "3-1", page: "10" } } },

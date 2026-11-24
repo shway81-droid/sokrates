@@ -27,3 +27,41 @@ test("context marks scope", () => {
   assert.ok(!c.includes(onlyAMiscWrong), "B 범위에 A 전용 오개념이 없어야 함");
 });
 test("context unknown textbook throws", () => assert.throws(() => T.buildContext(mini, "zzz")));
+
+// ---- 차시 범위 (주제 확장) ----
+const unit = require("./fixtures/unit-mini.js");
+const U = () => T.mergeTopics(structuredClone(unit), "작은 단원");
+
+test("lesson objects required", () => { const t = clone(); t.textbooks[0].lessons = ["3단원 1차시"]; assert.match(T.validateTopic(t).join(), /lessons/); });
+test("source lesson must be listed", () => { const t = clone(); t.concepts[0].sources.a.lesson = "3-9"; const e = T.validateTopic(t).join(); assert.match(e, /c1/); assert.match(e, /3-9/); });
+test("merge keeps lesson order and all items", () => {
+  const m = U();
+  assert.equal(m.title, "작은 단원");
+  assert.deepEqual(m.textbooks[0].lessons.map((l) => l.id), ["3-1", "3-2", "3-3", "3-5"]);
+  assert.equal(m.misconceptions.length, 4);
+  assert.deepEqual(T.validateTopic(m), []);
+});
+test("scope by lesson keeps taught lessons only", () => {
+  assert.deepEqual(T.scopeFor(U(), "a", "3-3").misconceptions.map((m) => m.id), ["u-1.m1", "u-1.m2", "u-2.m1"]);
+  assert.throws(() => T.scopeFor(U(), "a", "9-9"));
+});
+test("context: today first, earlier lessons next, later lessons out, all concepts for judging", () => {
+  const c = T.buildContext(U(), "a", "3-3");
+  assert.ok(c.includes("[오늘 차시: 교과서A 3단원 3~4차시 셋째 차시]"));
+  assert.ok(c.includes("흔한 오개념(오늘 차시):"));
+  assert.ok(c.includes("흔한 오개념(앞 차시):"));
+  assert.ok(c.indexOf("셋째 차시 오개념") < c.indexOf("첫 차시 오개념"));
+  assert.ok(!c.includes("다섯째 차시 오개념"));
+  assert.ok(c.includes("u-2.c2"), "전체 개념에는 아직 안 배운 개념도 들어감");
+});
+test("context: no misconception today → all taught at one rank", () => {
+  const m = U(); m.misconceptions = m.misconceptions.filter((x) => x.id !== "u-2.m1");
+  const c = T.buildContext(m, "a", "3-3");
+  assert.ok(!c.includes("(오늘 차시):") && c.includes("흔한 오개념:"));
+  assert.ok(c.includes("첫 차시 오개념"));
+});
+test("context: nothing taught → 없음", () => {
+  const m = U(); m.misconceptions = [];
+  assert.ok(T.buildContext(m, "a", "3-1").includes("흔한 오개념: 없음"));
+});
+test("context without lesson keeps old shape", () => assert.ok(!T.buildContext(U(), "a").includes("[오늘 차시")));
