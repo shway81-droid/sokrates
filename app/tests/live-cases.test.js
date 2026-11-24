@@ -2,7 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./load");
 const { cases } = load("tests/live-cases.js");
-const topic = load("data/topic-625.js");
+const topic = load("data/topic-3-2.js");
 
 test("live cases: PRD 예시 + 3세트 × 교과서 3종 = 10건", () => {
   assert.equal(cases.length, 10);

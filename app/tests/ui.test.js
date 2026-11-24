@@ -29,9 +29,9 @@ test("result text has summary, no name field", () => {
   assert.ok(!/틀렸|점수/.test(t));
 });
 
-const D = require("./load").load("data/topic-625.js");
+const D = require("./load").load("data/topic-3-2.js");
 const doneState = (over) => ({ phase: "done", items: ["북한이 남침했다", "유엔군이 도와주었다", "전쟁은 1953년에 끝났다"],
-  checks: ["ok", "ok", "think"], target: 2, mode: "counter", turns: [], misconception: "m01", verdict: "hold", summary: [], ...over });
+  checks: ["ok", "ok", "think"], target: 2, mode: "counter", turns: [], misconception: "3-2.m01", verdict: "hold", summary: [], ...over });
 test("teacher help: none for a strong verdict", () => assert.equal(U.teacherHelp(D, "chunjae", doneState({ verdict: "strong" })), null));
 test("teacher help: textbook truth, page and hints for the chosen textbook", () => {
   const h = U.teacherHelp(D, "chunjae", doneState({}));
