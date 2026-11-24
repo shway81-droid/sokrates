@@ -3,7 +3,8 @@
   const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, resultText, teacherHelp } = root.SokUI;
   const L = root.SokLLM;
   const T = root.SokTopic;
-  const TEXTBOOK_KEY = "sok.textbook";
+  const Cat = root.SokCatalog;
+  const KEYS = { textbook: "sok.textbook", unit: "sok.unit", lesson: "sok.lesson" };
 
   // 방법 등록: 다음 방법(모르는 친구, 오답 탐정 …)은 여기에 하나씩 더합니다.
   const methods = [];
@@ -13,23 +14,27 @@
   const $ = (id) => document.getElementById(id);
   const screen = $("screen");
   const topics = root.SOKRATES_TOPICS || {};
+  const units = root.SOKRATES_UNITS || [];
+
+  const storeGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const storeSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 무시 */ } };
 
   const app = {
     view: "start",
     methodId: methods[0].id,
-    topicId: Object.keys(topics)[0],
-    textbookId: null,
+    // 마지막으로 고른 교과서·단원·차시. 지금 목록에 없으면 Cat.resolve 가 첫 항목으로 대신합니다.
+    textbookId: storeGet(KEYS.textbook),
+    unitId: storeGet(KEYS.unit),
+    lessonKey: storeGet(KEYS.lesson),
+    scope: null, // 지금 학생의 세션을 만들 때 쓴 선택(Cat.resolve 결과)
     session: null,
     startedAt: null,
     stoppedAt: null,
     timerId: null,
   };
 
-  const storeGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-  const storeSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* 무시 */ } };
-
-  const topic = () => topics[app.topicId];
-  const textbook = () => topic().textbooks.find((t) => t.id === app.textbookId);
+  const current = () => Cat.resolve(units, topics, { textbookId: app.textbookId, unitId: app.unitId, key: app.lessonKey });
+  const scopeLabel = (sc) => `${sc.contextTitle} · ${sc.textbookName} ${sc.lessonLabel}`;
   const method = () => methods.find((m) => m.id === app.methodId);
 
   // ---------- 타이머 ----------
@@ -59,7 +64,7 @@
     const ctx = $("bar-context");
     const inLesson = app.view === "input" || app.view === "talk";
     ctx.hidden = !inLesson;
-    if (inLesson) ctx.textContent = `${topic().title} · ${textbook().name}`;
+    if (inLesson) ctx.textContent = scopeLabel(app.scope);
     $("bar-home").hidden = app.view === "start" || app.view === "settings";
     paintTimer();
   }
@@ -142,25 +147,28 @@
     },
 
     start() {
-      const t = topic();
-      const saved = storeGet(TEXTBOOK_KEY);
-      if (!app.textbookId) app.textbookId = t.textbooks.some((b) => b.id === saved) ? saved : t.textbooks[0].id;
+      const sc = current();
+      Object.assign(app, { textbookId: sc.textbookId, unitId: String(sc.unit.id), lessonKey: sc.choice.key });
+      const pick = (field, key) => (e) => { app[field] = e.target.value; storeSet(key, e.target.value); show("start"); };
 
       const methodSel = el("select", { id: "method", onchange: (e) => { app.methodId = e.target.value; } },
         methods.map((m) => el("option", { value: m.id, selected: m.id === app.methodId, text: m.name })));
-      const topicSel = el("select", { id: "topic", onchange: (e) => { app.topicId = e.target.value; app.textbookId = null; show("start"); } },
-        Object.values(topics).map((x) => el("option", { value: x.id, selected: x.id === app.topicId, text: `${x.title} (${x.subject} ${x.grade})` })));
-      const tbSel = el("select", { id: "textbook", "data-autofocus": true, onchange: (e) => { app.textbookId = e.target.value; storeSet(TEXTBOOK_KEY, e.target.value); } },
-        t.textbooks.map((b) => el("option", { value: b.id, selected: b.id === app.textbookId, text: b.name })));
-      const n = T.unreviewedCount(t);
+      const tbSel = el("select", { id: "textbook", onchange: pick("textbookId", KEYS.textbook) },
+        Cat.textbooksOf(sc.unit, topics).map((b) => el("option", { value: b.id, selected: b.id === sc.textbookId, text: b.name })));
+      const unitSel = el("select", { id: "unit", onchange: pick("unitId", KEYS.unit) },
+        Cat.availableUnits(units, topics).map((u) => el("option", { value: String(u.id), selected: u.id === sc.unit.id, text: `${u.id}. ${u.title}` })));
+      const lessonSel = el("select", { id: "lesson", "data-autofocus": true, onchange: pick("lessonKey", KEYS.lesson) },
+        sc.choices.map((c) => el("option", { value: c.key, selected: c.key === sc.choice.key, text: c.label })));
+      const n = Object.values(topics).reduce((sum, t) => sum + T.unreviewedCount(t), 0);
 
       return el("section", { class: "stack" }, [
         el("h1", { text: "오늘 배운 것을 함께 정리해 봐요" }),
         el("div", { class: "card stack" }, [
           el("label", { class: "field" }, [el("span", { text: "정리 방법" }), methodSel]),
-          el("label", { class: "field" }, [el("span", { text: "주제" }), topicSel]),
-          el("label", { class: "field" }, [el("span", { text: "우리 반 교과서" }), tbSel,
-            el("div", { class: "hint", text: "반례 질문은 고른 교과서 내용에서만 나와요." })]),
+          el("label", { class: "field" }, [el("span", { text: "우리 반 교과서" }), tbSel]),
+          el("label", { class: "field" }, [el("span", { text: "단원" }), unitSel]),
+          el("label", { class: "field" }, [el("span", { text: "오늘 차시" }), lessonSel,
+            el("div", { class: "hint", text: "반례 질문은 고른 교과서에서 오늘까지 배운 내용으로만 나와요." })]),
           n > 0 && el("div", { class: "note", text: `검토하지 않은 오개념이 ${n}개 있어요. review.html 에서 확인해 주세요.` }),
           el("div", { class: "row end" }, [el("button", { class: "btn", type: "button", text: "시작하기", onclick: () => newStudent() })]),
         ]),
@@ -169,7 +177,7 @@
 
     input() {
       const boxes = [0, 1, 2].map((i) => el("textarea", { rows: 1, id: `item-${i}`, "aria-label": `배운 것 ${i + 1}`,
-        "data-autofocus": i === 0 || null, placeholder: i === 0 ? "예) 북한이 38도선을 넘어 쳐들어왔어요" : "" }));
+        "data-autofocus": i === 0 || null, placeholder: i === 0 ? "예) 오늘 배운 것 한 가지" : "" }));
       const go = el("button", { class: "btn", type: "button", text: "확인하기" });
       boxes.forEach((b, i) => b.addEventListener("keydown", onEnter(() => (i < 2 ? boxes[i + 1].focus() : go.click()))));
       go.addEventListener("click", async () => {
@@ -260,12 +268,13 @@
     result() {
       const st = app.session.getState();
       const v = VERDICT_TEXT[st.verdict];
-      const meta = { topicTitle: topic().title, textbookName: textbook().name, dateStr: today(), state: st };
+      const sc = app.scope;
+      const meta = { topicTitle: sc.contextTitle, textbookName: `${sc.textbookName} ${sc.lessonLabel}`, dateStr: today(), state: st };
       return el("section", { class: "stack" }, [
         el("div", { class: `verdict ${st.verdict}` }, [el("div", { class: "label", text: v.label }), el("div", { class: "msg", text: v.message })]),
         el("div", { class: "card" }, [el("ul", { class: "summary" }, st.summary.map((line, i) =>
           el("li", {}, [el("span", { class: "k", text: SUMMARY_LABELS[i] }), el("span", { text: line })])))]),
-        helperBox(teacherHelp(topic(), app.textbookId, st)),
+        helperBox(teacherHelp(sc.topic, sc.textbookId, st, sc.choice.lessonId)),
         el("details", { class: "record card" }, [
           el("summary", { text: "문답 기록 보기" }),
           el("p", { text: `${meta.topicTitle} · ${meta.textbookName} · ${meta.dateStr} · ${formatElapsed((app.stoppedAt || Date.now()) - app.startedAt)}` }),
@@ -314,7 +323,9 @@
     if (app.session) app.session.cancel();
     const settings = L.loadSettings();
     if (!settings.apiKey) { show("settings"); return; }
-    app.session = method().createSession({ topic: topic(), textbookId: app.textbookId, llm: liveLLM });
+    const sc = current();
+    app.scope = sc;
+    app.session = method().createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: liveLLM });
     startTimer();
     show("input");
   }
