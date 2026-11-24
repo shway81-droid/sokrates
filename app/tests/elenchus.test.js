@@ -138,3 +138,6 @@ test("fallbacks are counted so a live check can see them", async () => {
   const { s: s2 } = make([CHECK]);
   assert.equal((await s2.submitItems(three)).fallbacks, 0);
 });
+test("reason question must be answerable from the chosen textbook", () => {
+  assert.ok(E.SYSTEM_PROMPT.includes("이유가 [반례에 쓸 수 있는 범위]에 나와 있는 항목"));
+});
