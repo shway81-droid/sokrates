@@ -141,3 +141,6 @@ test("fallbacks are counted so a live check can see them", async () => {
 test("reason question must be answerable from the chosen textbook", () => {
   assert.ok(E.SYSTEM_PROMPT.includes("이유가 [반례에 쓸 수 있는 범위]에 나와 있는 항목"));
 });
+test("a student who revises the target idea is revisit, not strong", () => {
+  assert.ok(E.SYSTEM_PROMPT.includes("처음 말한 대상 항목을 고쳐 말하면"));
+});
