@@ -1,6 +1,6 @@
 // 교사 화면 제어: 설정 → 시작(방법·주제·교과서) → 배운 3가지 → 확인과 반례 문답 → 판정과 정리
 (function (root) {
-  const { el, VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp } = root.SokUI;
+  const { el, verdictText, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp } = root.SokUI;
   const L = root.SokLLM;
   const T = root.SokTopic;
   const Cat = root.SokCatalog;
@@ -280,7 +280,7 @@
 
     result() {
       const st = app.session.getState();
-      const v = VERDICT_TEXT[st.verdict];
+      const v = verdictText(st);
       const sc = app.scope;
       const meta = { topicTitle: sc.contextTitle, textbookName: `${sc.textbookName} ${sc.lessonLabel}`, dateStr: today(), state: st };
       return el("section", { class: "stack" }, [

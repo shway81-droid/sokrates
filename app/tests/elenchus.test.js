@@ -301,3 +301,9 @@ test("named summary from the AI becomes the three lines in order", async () => {
   assert.deepEqual(st.summary, ["북한이 남침했다", "정전 협정을 근거로 댔다", "정전과 종전은 어떻게 다를까요?"]);
   assert.equal(st.fallbacks, 0);
 });
+
+test("summary rules say what the second line is after a retry with no counterexample", () => {
+  const p = E.SYSTEM_PROMPT;
+  assert.ok(p.includes("다시 말해 보게 하기(retry)로 끝난 판정 보류"));
+  assert.ok(p.includes('"반례"'));
+});

@@ -45,6 +45,7 @@
       if (charLen(t) > MAX_CHARS) return `세 줄 정리 ${i + 1}번째 줄이 ${charLen(t)}자로 ${MAX_CHARS}자를 넘음 — 더 짧게 줄일 것`;
       if (hasForbidden(t)) return "세 줄 정리에 금지어 포함";
       if (LABEL_PREFIX.test(t)) return "세 줄 정리 줄 앞에 칸 이름을 붙임";
+      if (/반례/.test(t)) return "세 줄 정리에 '반례'라는 어려운 말을 씀 — 학생에게 보여 주는 글이므로 쉬운 말로 쓸 것";
       if (THIRD_PERSON.test(t)) return "세 줄 정리를 '학생이'처럼 3인칭으로 씀(학생에게 보여 주는 글)";
     }
     if (!summary[2].trim().endsWith("?")) return "셋째 줄(다음 시간 확인할 것)이 물음표로 끝나는 질문이 아님";

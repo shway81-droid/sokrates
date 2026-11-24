@@ -71,3 +71,10 @@ test("summary reasons say which line and how long, so a retry can fix it", () =>
   const r = sv("strong", ["a", "가".repeat(45), "정전과 종전은 어떻게 다를까요?"]).reason;
   assert.ok(r.includes("2번째 줄") && r.includes("45자"), r);
 });
+
+// "반례"는 학생에게 어려운 말이라 세 줄 정리에 쓰지 않습니다(학생 화면 테스트에서 나옴).
+test("summary may not use the word 반례", () => {
+  const r = sv("hold", ["a", "반례를 받지 않아서 생각을 바꾼 것은 없어요", "임시 정부는 어떤 일을 했을까요?"]);
+  assert.equal(r.ok, false);
+  assert.ok(r.reason.includes("반례"), r.reason);
+});

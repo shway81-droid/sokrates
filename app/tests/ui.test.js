@@ -95,3 +95,17 @@ test("check labels: unsure is gentle, outside means another topic", () => {
   assert.equal(U.CHECK_TEXT.unsure, "교과서에서 함께 찾아봐요");
   assert.equal(U.CHECK_TEXT.outside, "오늘 주제와 다른 이야기예요");
 });
+
+// 이유 묻기로 튼튼한 생각이 되면 반례를 받은 적이 없으므로 "반례에도 무너지지 않았어요"라고 하지 않습니다.
+test("strong after a reason question does not mention a counterexample", () => {
+  const r = U.verdictText({ verdict: "strong", mode: "reason" });
+  assert.equal(r.label, "튼튼한 생각");
+  assert.ok(r.message.includes("까닭") && !r.message.includes("반례"), r.message);
+  assert.deepEqual(U.verdictText({ verdict: "strong", mode: "counter" }), U.VERDICT_TEXT.strong);
+  assert.deepEqual(U.verdictText({ verdict: "hold", mode: "reason" }), U.VERDICT_TEXT.hold);
+});
+
+test("copied result uses the reason wording too", () => {
+  const t = U.resultText({ ...sample, state: { ...sample.state, verdict: "strong", mode: "reason" } });
+  assert.ok(!t.includes("반례에도"), t);
+});

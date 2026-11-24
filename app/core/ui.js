@@ -5,6 +5,11 @@
     revisit: { label: "다시 볼 생각", message: "모르는 것을 알게 되었어요. 다음 시간에 확인해 봐요." },
     hold: { label: "판정 보류", message: "선생님과 더 이야기해 봐요." },
   };
+  // 이유 묻기로 튼튼한 생각이 되면 반례를 받은 적이 없으므로 다른 말을 씁니다.
+  const STRONG_REASON = { label: "튼튼한 생각", message: "까닭을 스스로 설명했어요. 근거가 있는 생각이에요." };
+  function verdictText(state) {
+    return state.verdict === "strong" && state.mode === "reason" ? STRONG_REASON : VERDICT_TEXT[state.verdict];
+  }
   const CHECK_TEXT = { ok: "✓", think: "더 생각해 볼 것", unsure: "교과서에서 함께 찾아봐요", outside: "오늘 주제와 다른 이야기예요" };
   const SUMMARY_LABELS = ["알게 된 것", "다시 생각한 것", "다음 시간 확인할 것"];
 
@@ -33,7 +38,7 @@
       state.turns.forEach((t, i) => lines.push(`질문${i + 1}: ${t.q}`, `답${i + 1}: ${t.a}`));
     }
     if (state.verdict) {
-      const v = VERDICT_TEXT[state.verdict];
+      const v = verdictText(state);
       lines.push("", `판정: ${v.label} — ${v.message}`);
       const r = rethink(state);
       if (r) lines.push(rethinkText(r));
@@ -86,7 +91,7 @@
     return node;
   }
 
-  const SokUI = { VERDICT_TEXT, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp, el };
+  const SokUI = { VERDICT_TEXT, verdictText, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp, el };
   if (typeof module !== "undefined" && module.exports) module.exports = SokUI;
   else root.SokUI = SokUI;
 })(this);
