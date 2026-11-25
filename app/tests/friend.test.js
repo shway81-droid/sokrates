@@ -37,7 +37,7 @@ test("schemaFor narrows kind and mark", () => {
 
 test("validate: a good ask and a good finish pass", () => {
   good(ASK(), expectAsk());
-  good(ASK({ kind: "mixup", misconception: "m1", mark: "explained", question: "그럼 군인들만 다친 거예요?", reaction: "아, 그렇구나!" }),
+  good(ASK({ kind: "mixup", misconception: "m1", mark: "explained", question: "그럼 군인들만 다친 거예요?", reaction: "아, 그렇군요!" }),
     expectAsk({ kinds: ["mixup"], prevKind: "meaning" }));
   good(FIN(), expectFin());
   good(FIN({ mark: "corrected" }), expectFin({ prevKind: "mixup" }));
@@ -64,6 +64,30 @@ test("validate: reaction that praises or confirms", () => {
   bad(ASK({ reaction: "잘했어요" }), expectAsk(), /반응/);
 });
 test("validate: reaction with a forbidden word", () => bad(ASK({ reaction: "정답은 아니에요" }), expectAsk(), /반응/));
+// 보완(11-25): 질문은 "~예요?" 존댓말인데 반응만 "아, 그렇구나!" 같은 반말 혼잣말이었습니다.
+test("validate: casual-speech reaction", () => {
+  for (const r of ["아, 그렇구나!", "신기하네!", "몰랐어.", "나도 그래", "음, 헷갈려", "그렇군", "재밌다!", "처음 알았는걸", "우리 동네랑 비슷해"])
+    bad(ASK({ reaction: r }), expectAsk(), /반말/);
+});
+test("validate: polite reactions and interjections pass", () => {
+  for (const r of ["아, 그렇군요!", "음, 헷갈려요.", "괜찮아요, 나도 잘 몰라요.", "몰랐어요!", "나도 궁금해요", "우와!", "아하!", "아, 몰랐습니다.", "오!", "네, 알겠어요.", ""])
+    good(ASK({ reaction: r }), expectAsk());
+});
+test("validate: praise reason shows a polite example", () => {
+  const v = F.validateFriendStep(ASK({ reaction: "맞아요!" }), expectAsk());
+  assert.match(v.reason, /그렇군요/); assert.doesNotMatch(v.reason, /그렇구나/);
+});
+// "맞아"가 "총에 맞아서"(다치다)에도 걸려 바른 반응까지 막았습니다. 칭찬·맞장구일 때만 잡습니다.
+test("PRAISE catches praise but not being hit", () => {
+  for (const r of ["맞아요!", "맞아, 그거예요", "맞아!", "맞네요", "맞죠", "맞습니다", "잘했어요", "훌륭해요"]) assert.ok(F.PRAISE.test(r), r);
+  for (const r of ["총에 맞아서 다쳤구나", "총에 맞아서 다쳤군요", "비를 맞아도 괜찮아요", "매를 맞았대요"]) assert.ok(!F.PRAISE.test(r), r);
+  good(ASK({ reaction: "총에 맞아서 다쳤군요" }), expectAsk());
+});
+test("schema and prompt ask for a polite reaction", () => {
+  assert.match(F.schemaFor({ stage: "ask", kinds: ["meaning"] }).properties.reaction.description, /존댓말/);
+  assert.ok(F.SYSTEM_PROMPT.includes("아, 그렇군요!"));
+  assert.ok(!/reaction "아, 그렇구나!"/.test(F.SYSTEM_PROMPT)); // 예시는 존댓말로
+});
 test("validate: empty thanks", () => bad(FIN({ thanks: " " }), expectFin(), /한마디/));
 test("validate: 41-char thanks", () => bad(FIN({ thanks: chars(41) }), expectFin(), /한마디/));
 test("validate: 40-char thanks passes", () => good(FIN({ thanks: chars(40) }), expectFin()));
@@ -111,7 +135,7 @@ const msgText = (req) => req.messages[0].content.map((b) => b.text).join("\n");
 // 학생마다 바뀌는 둘째 블록만 봅니다(첫 블록인 단원 맥락에는 모든 오개념의 바른 생각이 들어 있음).
 const noteText = (req) => req.messages[0].content.slice(-1)[0].text;
 const Q1 = ASK({ kind: "meaning", question: "다쳤다는 게 누가 다친 거예요?" });
-const Q2 = (mark = "explained") => ASK({ kind: "mixup", misconception: "m1", mark, reaction: "아, 그렇구나!", question: "그럼 군인들만 다친 거예요?" });
+const Q2 = (mark = "explained") => ASK({ kind: "mixup", misconception: "m1", mark, reaction: "아, 그렇군요!", question: "그럼 군인들만 다친 거예요?" });
 const Q3 = (mark = "corrected") => ASK({ kind: "meaning", mark, question: "왜 마을 사람들도 다쳤어요?" });
 
 test("rejects blank explanation", async () => { const { s } = make([]); await assert.rejects(s.submitExplanation("  ")); });
@@ -121,7 +145,7 @@ test("full flow: three questions, marks, then the result", async () => {
   let st = await s.submitExplanation(EXPLAIN);
   assert.equal(st.phase, "asking"); assert.equal(st.question, Q1.question); assert.equal(st.kind, "meaning");
   st = await s.submitAnswer("군인도 다치고 보통 사람도 다쳤어요.");
-  assert.equal(st.question, "그럼 군인들만 다친 거예요?"); assert.equal(st.reaction, "아, 그렇구나!"); assert.equal(st.misconception, "m1");
+  assert.equal(st.question, "그럼 군인들만 다친 거예요?"); assert.equal(st.reaction, "아, 그렇군요!"); assert.equal(st.misconception, "m1");
   st = await s.submitAnswer("아니에요, 마을에서도 싸워서 보통 사람도 다쳤어요.");
   st = await s.submitAnswer("몰라요.");
   assert.equal(st.phase, "done");
@@ -258,7 +282,7 @@ test("fallback after two bad questions: default question, a valid mark is kept",
 });
 
 test("fallback with a praising reaction keeps the valid mark", async () => {
-  const praise = Q2("explained"); praise.reaction = "맞아요, 그렇구나!";
+  const praise = Q2("explained"); praise.reaction = "맞아요, 그렇군요!";
   const { s } = make([Q1, praise, praise]);
   await s.submitExplanation(EXPLAIN);
   const st = await s.submitAnswer("1");
@@ -357,6 +381,7 @@ test("friendHelp for a mixup question uses that misconception", () => {
   const h = F.friendHelp(mini, "a", doneState([turn({ q: "그럼 A에만 있어요?", kind: "mixup", misconception: "m1", mark: "together" })]), "3-1");
   assert.equal(h.sections.length, 1);
   assert.equal(h.sections[0].item, "그럼 A에만 있어요?"); assert.equal(h.sections[0].truth, "바른 생각 하나");
+  assert.equal(h.sections[0].itemLabel, "살펴볼 질문"); // 이 방법에서는 친구의 질문이 들어갑니다(엘렌코스는 "살펴볼 생각")
   assert.deepEqual(h.sections[0].hints, ["힌트1"]);
 });
 
@@ -365,6 +390,7 @@ test("friendHelp shows today's lesson only once", () => {
   assert.equal(h.sections.length, 2);
   assert.ok(h.sections[0].where); assert.ok(h.sections[0].notes.length > 0);
   assert.equal(h.sections[1].item, "둘째 질문"); assert.equal(h.sections[1].where, null); assert.deepEqual(h.sections[1].notes, []);
+  assert.ok(h.sections.every((s) => s.itemLabel === "살펴볼 질문"));
 });
 
 test("prompt keeps the rules", () => {

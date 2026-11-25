@@ -74,10 +74,10 @@
     delete window.SOKRATES_TEXTS;
   </script>
   <script src="../core/ui.js?v=3"></script>
-  <script src="../core/parts.js?v=3"></script>
+  <script src="../core/parts.js?v=4"></script>
   <script src="../methods/elenchus.js"></script>
   <script src="../methods/elenchus-views.js?v=3"></script>
-  <script src="../methods/friend.js?v=8"></script>
+  <script src="../methods/friend.js?v=9"></script>
   <script src="../methods/friend-views.js?v=7"></script>
   <script src="../core/app.js?v=3"></script>
   <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
@@ -156,7 +156,7 @@
         snap("start");
         const EXPLAIN = "북한이 쳐들어와서 전쟁이 났고 많은 사람이 다쳤어요.";
         const ASK1 = { stage: "ask", mark: "none", kind: "meaning", misconception: "none", reaction: "", question: "전쟁이 나면 왜 사람들이 다쳐요?" };
-        const ASK2 = { stage: "ask", mark: "explained", kind: "mixup", misconception: "3-2.m06", reaction: "아, 그렇구나!", question: "그럼 싸운 군인들만 다친 거예요?" };
+        const ASK2 = { stage: "ask", mark: "explained", kind: "mixup", misconception: "3-2.m06", reaction: "아, 그렇군요!", question: "그럼 싸운 군인들만 다친 거예요?" };
         const ASK3 = { stage: "ask", mark: "corrected", kind: "meaning", misconception: "none", reaction: "몰랐어요!", question: "피란은 왜 가야 했어요?" };
         const FIN = (mark) => ({ stage: "finish", mark, thanks: "덕분에 보통 사람들도 다쳤다는 걸 알았어요!", nextQuestion: "사람들은 왜 피란을 떠났을까요?" });
         const explain = (t) => { q("#explain").value = t; click("보내기"); };

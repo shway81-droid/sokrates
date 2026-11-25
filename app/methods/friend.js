@@ -23,7 +23,14 @@
   const REACTION_MAX = 20;
   const THANKS_MAX = 40;
   // 반응에 칭찬·맞장구가 들어가면, 학생이 틀린 말을 했을 때도 "맞아요"가 나올 수 있어 막습니다.
-  const PRAISE = /맞아|맞네|맞죠|잘했|정답|훌륭/;
+  // "맞아"는 칭찬·맞장구일 때만 잡습니다("총에 맞아서", "비를 맞아도"는 다치다·맞다 뜻이라 통과).
+  const PRAISE = /맞(?:아|네|죠|습니다|군요|구나)(?![서도야])|잘했|정답|훌륭/;
+  // 반응도 질문처럼 존댓말로 씁니다. 쉼표·마침표·느낌표로 나눈 마디마다 끝을 봅니다.
+  // "아", "오" 같은 한 글자 감탄사와 "우와", "아하" 같은 감탄사는 통과, "~니다"는 존댓말이라 통과합니다.
+  const CASUAL_END = /(구나|구먼|군|네|어|아|야|지|다|래|해|려|워|라|봐|돼|줘|걸|데)$/;
+  const INTERJECTION = new Set(["아하", "우와", "와아", "이야", "어머", "오오", "아아", "오호", "어라"]);
+  const isCasual = (r) => String(r).split(/[,.!~…]+/).map((c) => c.replace(/\s/g, "")).some((c) =>
+    c === "응" || (G.charLen(c) >= 2 && !INTERJECTION.has(c) && !/니다$/.test(c) && CASUAL_END.test(c)));
   const THIRD_PERSON = /^학생(이|은|의|도|에게)\s/;
   // 둘 중 하나를 고르게 하는 질문. 고르게 하면 답을 알려 주는 셈입니다.
   // - "~까요, ~까요?"처럼 묻는 말 두 개(앞의 "있잖아요,", "그런데요," 같은 이어 주는 말은 빼고)
@@ -56,7 +63,7 @@
         mark,
         kind: { type: "string", enum: kinds.slice() },
         misconception: STR,
-        reaction: { type: "string", description: `학생의 앞 답을 받는 친구의 짧은 한마디, ${REACTION_MAX}자 이내, 물음표·칭찬·정답 없이. 없으면 ""` },
+        reaction: { type: "string", description: `학생의 앞 답을 받는 친구의 짧은 한마디, ${REACTION_MAX}자 이내, "아, 그렇군요!"처럼 존댓말로, 물음표·칭찬·정답 없이. 없으면 ""` },
         question: { type: "string", description: "친구의 질문 1문장, 40자 이내, \"요?\"로 끝나는 존댓말" },
       },
       required: ["stage", "mark", "kind", "misconception", "reaction", "question"],
@@ -100,7 +107,8 @@
     const r = typeof out.reaction === "string" ? out.reaction.trim() : "";
     if (G.charLen(r) > REACTION_MAX) return fail(`반응이 ${G.charLen(r)}자로 ${REACTION_MAX}자를 넘음 — 더 짧게 하거나 비울 것`);
     if (/[?？]/.test(r)) return fail("반응에 물음표가 있음 — 질문은 question 칸에만 쓸 것");
-    if (PRAISE.test(r) || hasForbidden(r)) return fail("반응에 칭찬·맞장구·정답 말이 있음 — '아, 그렇구나!'처럼 느낌만 쓰거나 비울 것");
+    if (PRAISE.test(r) || hasForbidden(r)) return fail("반응에 칭찬·맞장구·정답 말이 있음 — '아, 그렇군요!'처럼 느낌만 쓰거나 비울 것");
+    if (isCasual(r)) return fail("반응이 반말임 — '아, 그렇군요!', '음, 헷갈려요.'처럼 질문과 같은 존댓말로 쓰거나 비울 것");
     return { ok: true };
   }
 
@@ -132,7 +140,8 @@
 - mixup 질문의 표시는 "corrected"나 "together", 그 밖의 질문의 표시는 "explained"나 "together"만 씁니다.
 
 반응(reaction): 질문 앞에 붙는 친구의 짧은 한마디입니다. 20자 이내, 물음표 없이, 비워 두어도 됩니다.
-- 느낌만 씁니다(예: "아, 그렇구나!", "음, 헷갈려요.", "괜찮아요, 나도 잘 몰라요."). 학생 말을 따라 하는 것은 괜찮습니다.
+- 느낌만 씁니다(예: "아, 그렇군요!", "음, 헷갈려요.", "괜찮아요, 나도 잘 몰라요."). 학생 말을 따라 하는 것은 괜찮습니다.
+- 질문처럼 존댓말로 씁니다. 반말 혼잣말은 쓰지 않습니다(안 됨: "아, 그렇구나!", "신기하네!", "몰랐어.").
 - 정답이나 학생이 하지 않은 사실을 넣지 않습니다. "맞아요", "잘했어요" 같은 칭찬이나 맞장구도 쓰지 않습니다. 학생이 틀린 말을 했을 때도 맞다고 하게 되기 때문입니다.
 - 학생이 장난치거나 오늘 주제와 관계없는 말을 하면, 맞장구치거나 재미있다고 하지 않고(안 됨: "재미있는 얘기네요!") "음, 나는 잘 모르겠어요."처럼 담담하게 받습니다.
 
@@ -144,7 +153,7 @@
 학생의 설명: 북한이 쳐들어와서 전쟁이 났고 많은 사람이 다쳤어요.
 첫 질문: kind "meaning", reaction "", question "전쟁이 나면 왜 사람들이 다쳐요?"
 학생 답: 마을에서도 싸워서 집이 부서지고 사람들이 다쳤어요.
-다음 질문: mark "explained", kind "mixup", misconception "3-2.m06", reaction "아, 그렇구나!", question "그럼 싸운 군인들만 다친 거예요?"
+다음 질문: mark "explained", kind "mixup", misconception "3-2.m06", reaction "아, 그렇군요!", question "그럼 싸운 군인들만 다친 거예요?"
 학생 답: 아니에요. 피란 가던 보통 사람들도 많이 다쳤어요.
 다음 질문: mark "corrected", kind "meaning", reaction "몰랐어요!", question "피란은 왜 가야 했어요?"
 학생 답: 몰라요.
@@ -368,8 +377,9 @@
     if (!together.length) return null;
     let todayShown = false;
     const sections = together.map((t) => {
-      const h = U.helpFor(topic, textbookId, { item: t.q, misconception: t.misconception, lessonId });
-      if (!h) return null;
+      const base = U.helpFor(topic, textbookId, { item: t.q, misconception: t.misconception, lessonId });
+      if (!base) return null;
+      const h = { ...base, itemLabel: "살펴볼 질문" }; // 이 방법의 item은 친구의 질문입니다(엘렌코스는 "살펴볼 생각")
       if (h.truth) return h; // 오개념 쪽은 질문마다 다릅니다(같은 오개념을 두 번 쓰지 않음)
       if (todayShown) return { ...h, where: null, notes: [] };
       todayShown = true;
@@ -380,7 +390,7 @@
 
   const SokFriend = {
     id: "friend", name: "모르는 친구", ERROR_MESSAGE, KINDS, MARK_TEXT, DEFAULT_QUESTION, DEFAULT_FINISH, SYSTEM_PROMPT,
-    marksFor, schemaFor, validateFriendStep, createSession, resultText, friendHelp,
+    PRAISE, marksFor, schemaFor, validateFriendStep, createSession, resultText, friendHelp,
   };
   if (isNode) module.exports = SokFriend;
   else root.SokFriend = SokFriend;

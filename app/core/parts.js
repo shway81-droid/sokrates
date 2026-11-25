@@ -66,7 +66,7 @@
   function helpLines(help) {
     const line = (k, v) => el("p", {}, [el("span", { class: "k", text: k }), el("span", { text: v })]);
     return [
-      help.item && line("살펴볼 생각", help.item),
+      help.item && line(help.itemLabel || "살펴볼 생각", help.item), // 모르는 친구는 itemLabel "살펴볼 질문"
       help.truth && line("교과서 내용", help.truth),
       help.where && line("펼쳐 볼 곳", help.where),
       help.notes && help.notes.length > 0 && el("div", { class: "notes" }, [
