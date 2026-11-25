@@ -380,6 +380,37 @@ test("error then retry repeats the judge call", async () => {
   assert.equal(userText(llm.calls[0]), userText(llm.calls[1]));
 });
 
+test("finishNow from the error screen keeps what the student did", async () => {
+  const s = await started(fakeLLM([SOLVED, new Error("연결 실패")]));
+  await s.select(1); await s.submitReason("보통 사람도 다쳤어요"); await s.next();
+  await s.select(0);
+  let st = await s.submitReason("날짜가 이상해요");
+  await s.select(2);
+  st = await s.submitReason("북한군이 먼저 쳐들어왔어요");
+  assert.equal(st.phase, "error");
+  st = await s.finishNow();
+  assert.equal(st.phase, "done");
+  assert.deepEqual(st.records.map((r) => r.mark), ["solved", "found"]);
+  assert.equal(st.records[1].wrongTaps.length, 1); assert.equal(st.records[1].reason, "북한군이 먼저 쳐들어왔어요");
+});
+test("finishNow between problems ends with the marks so far", async () => {
+  const s = await started(fakeLLM([SOLVED]));
+  await s.select(1);
+  let st = await s.submitReason("보통 사람도 다쳤어요");
+  assert.equal(st.step, "between");
+  st = await s.finishNow();
+  assert.equal(st.phase, "done"); assert.deepEqual(st.records.map((r) => r.mark), ["solved"]);
+});
+test("finishNow does nothing while waiting for the AI", async () => {
+  let release;
+  const s = await started(fakeLLM([() => new Promise((r) => { release = () => r(SOLVED); })]));
+  await s.select(1);
+  const p = s.submitReason("보통 사람도 다쳤어요");
+  const st = await s.finishNow();
+  assert.equal(st.phase, "waiting");
+  release(); await p;
+});
+
 test("message keeps two blocks, first cached; wrong taps are not sent", async () => {
   const llm = fakeLLM([SOLVED]);
   const s = await started(llm);

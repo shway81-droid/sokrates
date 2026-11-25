@@ -23,6 +23,11 @@
     }));
   }
 
+  // 카드를 누를 때마다 화면을 새로 그리므로, 까닭 칸에 쓰던 글을 세션·문제마다 기억해 두었다가 다시 넣습니다.
+  // 보내면 지웁니다(맞는 문장을 보낸 뒤 다른 카드를 누르면 빈 칸).
+  const drafts = new WeakMap();
+  const draftOf = (s, index) => { const d = drafts.get(s); return d && d.index === index ? d.text : ""; };
+
   const finishBtn = (kit) => el("button", { class: "btn quiet", type: "button", text: "바로 정리하기", onclick: () => kit.act(kit.session.finishNow()) });
 
   const views = {
@@ -62,14 +67,18 @@
       }
 
       if (st.phase === "waiting") parts.push(P.thinkingCard(WHO, dots()));
-      if (st.phase === "error") parts.push(...P.errorArea(kit));
+      // 오류 화면에서도 그때까지 한 것을 결과로 남기고 끝낼 수 있게 합니다.
+      if (st.phase === "error") parts.push(...P.errorArea(kit), el("div", { class: "row end" }, [finishBtn(kit)]));
       if (st.phase === "asking" && st.step === "pick") {
         if (st.line) parts.push(el("div", { class: "dt-line card", text: st.line }));
         if (st.selected != null) {
           // 어느 문장을 눌러도 같은 질문과 칸이 나옵니다(보내기 전에는 맞는 문장인지 알려 주지 않음).
           const box = el("textarea", { rows: 2, id: "reason", "data-autofocus": true, "aria-label": "왜 이상한지", placeholder: "왜 이상한지 적어 주세요" });
+          box.value = draftOf(s, st.index);
+          box.addEventListener("input", () => drafts.set(s, { index: st.index, text: box.value }));
           const send = () => {
             if (!box.value.trim()) { box.focus(); return; }
+            drafts.delete(s);
             kit.act(s.submitReason(box.value));
           };
           box.addEventListener("keydown", kit.onEnter(send));
@@ -87,6 +96,7 @@
         const last = st.index + 1 >= st.problems.length;
         parts.push(el("div", { class: `dt-line card ${r.mark}`, text: st.line }));
         parts.push(el("div", { class: "row end" }, [
+          !last && finishBtn(kit), // 마지막 문제의 [결과 보기]가 곧 정리하기라서 그때는 두지 않습니다
           el("button", { class: "btn", type: "button", text: last ? "결과 보기" : "다음 문제", "data-autofocus": true, onclick: () => kit.act(s.next()) }),
         ]));
       }

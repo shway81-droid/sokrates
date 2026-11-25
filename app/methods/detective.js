@@ -405,8 +405,9 @@
       },
 
       // [바로 정리하기]: 하던 문제는 까닭을 보냈으면 found, 아니면 together. 시작하지 않은 문제는 결과에 나오지 않습니다.
+      // AI 연결이 끊긴 오류 화면에서도 누를 수 있어, 그때까지 한 기록을 결과로 남깁니다.
       async finishNow() {
-        if (state.phase !== "asking") return snapshot();
+        if (state.phase !== "asking" && state.phase !== "error") return snapshot();
         const r = record();
         if (r && !r.mark) r.mark = r.reason != null ? "found" : "together";
         Object.assign(state, { phase: "done", selected: null, question: null, line: null });

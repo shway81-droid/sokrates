@@ -82,8 +82,8 @@
   <script src="../methods/elenchus-views.js?v=3"></script>
   <script src="../methods/friend.js?v=9"></script>
   <script src="../methods/friend-views.js?v=7"></script>
-  <script src="../methods/detective.js?v=6"></script>
-  <script src="../methods/detective-views.js?v=1"></script>
+  <script src="../methods/detective.js?v=7"></script>
+  <script src="../methods/detective-views.js?v=2"></script>
   <script src="../core/app.js?v=3"></script>
   <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
   <script>
@@ -197,13 +197,19 @@
         await go(); snap("input");
         click("시작"); await until(() => q(".dt-card"), "문제"); snap("pick");
         await card(0); snap("picked");
+        // 카드를 바꿔 눌러도 까닭 칸에 쓰던 글이 남아야 합니다.
+        q("#reason").value = "쓰던 글"; q("#reason").dispatchEvent(new Event("input")); await card(3);
+        await until(() => q('.dt-card[data-i="3"]').getAttribute("aria-pressed") === "true", "카드 ④ 누름");
+        if (q("#reason").value !== "쓰던 글") throw new Error("카드를 바꾸자 까닭 칸 글이 지워짐"); await card(0);
         reason("집이 부서진 건 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤"); snap("wrong-1");
+        await card(1); if (q("#reason").value !== "") throw new Error("보낸 뒤에도 까닭 칸에 글이 남음");
         await card(1); queue("PENDING"); reason("군인만 다친 게 아니에요"); await until(() => q(".thinking"), "생각 중"); snap("waiting");
         await home();
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
         await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문"); snap("follow");
         queue(ASK("마을에서 싸움이 나면 누가 다칠까요?")); await answer("몰라요"); await until(() => asking() && asking().textContent.startsWith("마을"), "질문 2");
         queue({ result: "found" }); await answer("군인이요"); await until(() => btn("다음 문제"), "넘어가기"); snap("between-found");
+        if (!btn("바로 정리하기")) throw new Error("다음 문제 화면에 [바로 정리하기]가 없음");
         click("다음 문제"); await until(() => q(".dt-card") && !q(".dt-line"), "문제 2");
         await card(0); reason("날짜가 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤");
         await card(2); queue({ result: "solved", question: "" }); reason("북한군이 먼저 쳐들어왔어요"); await until(() => btn("결과 보기"), "넘어가기"); snap("between-solved");
@@ -215,6 +221,7 @@
         await home();
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
         await card(1); queue(new Error("연결 실패")); reason("보통 사람도 다쳤어요"); await until(() => q(".error-box"), "오류"); snap("error");
+        click("바로 정리하기"); await until(done, "오류 뒤 결과"); snap("error-finish");
       },
     };
     // 모르는 친구를 붙인 뒤 엘렌코스 시작 화면은 정리 방법 목록에 한 줄이 늘어난 것만 달라야 합니다.
