@@ -78,6 +78,8 @@ const FACT_QS = [
   "6월 25일에 38도선을 넘어 온 군대는 어느 나라 군대였을까요?",
   "그럼 6·25 전쟁은 누가 먼저 일으켰을까요?",
   "누가 만세 시위를 처음 외쳤을까요?",
+  "6월 25일에 38도선을 넘어 쳐들어온 군대는 어디 군대였을까요?",
+  "그 사람들은 어디 사람이었을까요?",
 ];
 const OPEN_QS = [
   "그럼 늘어난 쌀은 실제로 누구의 밥상에 올라갔을까요?",
@@ -90,6 +92,8 @@ const OPEN_QS = [
   "헌병이 늘 지켜보는 곳에서 마음 놓고 모일 수 있었을까요?",
   "날짜 말고 문장의 누가 한 일이 이상한지 찾아볼까요?",
   "마을에서 싸움이 나면 누가 다칠까요?",
+  "이봉창이 폭탄을 던진 곳을 떠올리면 어디가 걸리나요?",
+  "그 문장의 어디가 실제와 다를까요?",
 ];
 test("fact check: questions that make the student recall one fact are caught", () => {
   for (const q of FACT_QS) assert.equal(D.isFactQuestion(q), true, q);
