@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>실제 AI 점검 (오답 탐정)</title>
+  <style>
+    :root { --bg: #fbf6ec; --paper: #fffdf8; --ink: #2b2118; --soft: #6b5a48; --line: #e6d9c3; --accent: #1f6f6b; --same: #2f7a3e; --diff: #a65f00; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Noto Sans KR", "Malgun Gothic", sans-serif; }
+    main { max-width: 1440px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    .lead, .note { color: var(--soft); }
+    .note { background: #fff1d6; border-radius: 10px; padding: 10px 14px; color: #6b4300; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0; }
+    button { font: inherit; font-weight: 700; padding: 10px 20px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    button.secondary { background: var(--paper); color: var(--ink); border: 2px solid var(--line); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--paper); }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+    th { background: #f3eadb; white-space: nowrap; }
+    td.same { color: var(--same); font-weight: 700; }
+    td.diff { color: var(--diff); font-weight: 700; }
+    td p { margin: 0 0 6px; }
+    .k { color: var(--soft); font-size: 13px; }
+    .bad { color: var(--diff); font-weight: 700; }
+    #summary { font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>실제 AI 점검 (오답 탐정)</h1>
+  <p class="lead">가상 학생 <span id="count"></span>명이 친구의 정리에서 문장을 누르고 까닭을 쓰면, 실제 Claude가 판단하고 이어 묻습니다. 질문과 표시가 기대와 같은지 봅니다. 학생 이름은 쓰지 않습니다.</p>
+  <p id="key-note" class="note" hidden>저장된 API 키가 없어요. <a href="../index.html">앱</a>의 [설정]에서 키를 넣고 이 페이지를 새로 고쳐 주세요.</p>
+  <p id="settings" class="lead"></p>
+  <div class="row">
+    <button id="run" type="button">모두 실행</button>
+    <button id="copy" type="button" class="secondary" disabled>결과를 표(Markdown)로 복사</button>
+    <span id="summary" aria-live="polite"></span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>#</th><th>경우</th><th>숨은 문장 · 핵심</th><th>누른 문장과 까닭</th><th>안내 · 질문 (글자 수)</th><th>답</th><th>표시</th><th>기대</th><th>일치</th><th>대체</th><th>호출</th><th>시간</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="../data/units.js"></script>
+<script src="../data/topic-3-1.js"></script>
+<script src="../data/topic-3-2.js"></script>
+<script src="../data/detective-3-1.js?v=3"></script>
+<script src="../data/detective-3-2.js?v=2"></script>
+<!-- 교과서 원문: 선생님 PC에만 있는 파일(tools/build_local_texts.py로 만듦). 없으면 요약 개념만으로 판단합니다. -->
+<script src="../local/texts.js" onerror="this.remove()"></script>
+<script src="../core/guard.js"></script>
+<script src="../core/topic.js"></script>
+<script src="../core/catalog.js"></script>
+<script src="../core/llm.js"></script>
+<script src="../core/ui.js?v=3"></script>
+<script src="../methods/detective.js?v=12"></script>
+<script src="live-cases.js"></script>
+<script src="live-detective-cases.js?v=1"></script>
+<script>
+(function () {
+  const L = window.SokLLM, G = window.SokGuard, D = window.SokDetective, C = window.SokCatalog;
+  const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
+  const cases = window.SokLiveDetectiveCases.cases, QUIZ = window.SokLiveCases.QUIZ;
+  const settings = L.loadSettings();
+  // ?model=claude-haiku-5-5 처럼 주면 저장된 설정은 그대로 두고 이 페이지에서만 모델을 바꿉니다.
+  const forced = new URLSearchParams(location.search).get("model");
+  if (forced) settings.model = forced;
+  const $ = (id) => document.getElementById(id);
+  const results = [];
+  const NUM = ["①", "②", "③", "④"];
+
+  $("settings").textContent = `모델 ${settings.model} · 노력 ${settings.effort}`;
+  $("count").textContent = cases.length;
+  if (!settings.apiKey) { $("key-note").hidden = false; $("run").disabled = true; }
+
+  async function runCase(c) {
+    const llm = L.createClaudeLLM(settings);
+    let calls = 0;
+    let cause = null; // 실제 오류 원인(상태 코드와 API 메시지). 키는 들어 있지 않습니다.
+    const counted = { async call(req) {
+      calls++;
+      try { return await llm.call(req); } catch (e) { cause = String((e && e.message) || e).slice(0, 300); throw e; }
+    } };
+    const t0 = performance.now();
+    const sc = C.resolve(UNITS, TOPICS, { textbookId: c.textbookId, unitId: c.unitId, key: c.key });
+    const s = D.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted,
+      sourceText: C.sourceText(window.SOKRATES_TEXTS, sc.textbookId, sc.choice.lessonId), problemIds: [c.problem] });
+    let st = await s.start();
+    const p = st.problems[0];
+    const lines = []; // 학생이 본 고정 안내 문구(맞는 문장을 눌렀을 때와 마무리 때)
+    let w = 0;
+    for (const tap of c.taps) {
+      if (st.phase !== "asking" || st.step !== "pick") break;
+      const looked = new Set(st.records[0].wrongTaps.map((x) => x.index));
+      const i = tap === "hidden" ? p.hidden : [0, 1, 2, 3].find((k) => k !== p.hidden && !looked.has(k));
+      st = await s.select(i);
+      st = await s.submitReason(tap === "hidden" ? c.reason : c.wrongReasons[w++]);
+      if (st.line && st.step === "pick") lines.push(st.line);
+    }
+    let a = 0;
+    while (st.phase === "asking" && st.step === "follow") {
+      st = a < c.answers.length ? await s.submitAnswer(c.answers[a++]) : await s.finishNow();
+    }
+    const endLine = st.phase === "asking" && st.step === "between" ? st.line : null; // 마무리 안내(질문 뒤에 보임)
+    const ms = performance.now() - t0;
+    const r = st.records[0];
+    const turns = r.turns || [];
+    // 정답 새기: 학생이 아직 말하지 않은 정답 낱말이 질문에 먼저 나옴
+    let said = r.reason || "";
+    const leaks = [];
+    for (const t of turns) { const lw = D.leakIn(t.q, p.leakWords, said); if (lw) leaks.push(lw); said += " " + t.a; }
+    const quiz = turns.filter((t) => QUIZ.test(t.q) || D.isChoice(t.q) || D.isFactQuestion(t.q)).length;
+    const ok = st.phase !== "error" && c.expect.mark.includes(r.mark);
+    // 검사에 걸려 기본값으로 대신했거나, 퀴즈·고르기·사실 묻기 질문을 냈거나, 정답 낱말을 먼저 말했으면 "다름"으로 셉니다.
+    const same = ok && st.fallbacks === 0 && quiz === 0 && leaks.length === 0;
+    return { c, st, p, r, turns, lines, endLine, leaks, calls, ms, same, ok, quiz, cause };
+  }
+
+  function cell(content, cls) {
+    const td = document.createElement("td");
+    if (Array.isArray(content)) content.forEach((n) => td.append(n)); else td.textContent = content;
+    if (cls) td.className = cls;
+    return td;
+  }
+  function para(text, cls) { const p = document.createElement("p"); p.textContent = text; if (cls) p.className = cls; return p; }
+  const tapLines = (r) => [
+    ...r.r.wrongTaps.map((x) => `${NUM[x.index]} ${r.p.sentences[x.index]} → ${x.reason}`),
+    ...(r.r.reason != null ? [`${NUM[r.p.hidden]}(숨은) → ${r.r.reason}`] : []),
+  ];
+  const badQ = (q) => QUIZ.test(q) || D.isChoice(q) || D.isFactQuestion(q) || G.charLen(q) > G.MAX_CHARS;
+  const markText = (r) => r.st.phase === "error" ? `오류: ${r.cause || r.st.error}` : (r.r.mark || "-");
+
+  function render(n, r) {
+    const tr = document.createElement("tr");
+    tr.append(cell(String(n)), cell(r.c.name));
+    tr.append(cell([para(`${NUM[r.p.hidden]} ${r.p.sentences[r.p.hidden]}`), para(`핵심: ${r.p.key}`, "k")]));
+    tr.append(cell(tapLines(r).map((t) => para(t))));
+    tr.append(cell([
+      ...r.lines.map((l) => para(`[안내] ${l}`, "k")),
+      ...r.turns.map((t, i) => para(`${i + 1}. ${t.q} (${G.charLen(t.q)})`, badQ(t.q) ? "bad" : "")),
+      ...(r.endLine ? [para(`[마무리] ${r.endLine}`, "k")] : []),
+      ...(r.leaks.length ? [para(`정답 낱말 먼저: ${r.leaks.join(", ")}`, "bad")] : []),
+    ]));
+    tr.append(cell(r.turns.map((t, i) => para(`${i + 1}. ${t.a}`))));
+    tr.append(cell(markText(r)));
+    tr.append(cell(r.c.expect.mark.join("/")));
+    tr.append(cell(r.same ? "같음" : "다름", r.same ? "same" : "diff"));
+    tr.append(cell(String(r.st.fallbacks), r.st.fallbacks ? "diff" : ""), cell(String(r.calls)), cell(`${(r.ms / 1000).toFixed(1)}초`));
+    $("rows").append(tr);
+  }
+
+  function markdown() {
+    const esc = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+    const out = [`모델 ${settings.model} · 노력 ${settings.effort} · ${new Date().toISOString().slice(0, 10)}`, "",
+      "| # | 경우 | 숨은 문장 · 핵심 | 누른 문장과 까닭 | 안내 · 질문 (글자 수) | 답 | 표시 | 기대 | 일치 | 대체 | 호출 | 시간 |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|"];
+    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${NUM[r.p.hidden]} ${esc(r.p.sentences[r.p.hidden])}<br>핵심: ${esc(r.p.key)} | ${tapLines(r).map(esc).join("<br>")} | ${[...r.lines.map((l) => `[안내] ${esc(l)}`), ...r.turns.map((t, j) => `${j + 1}. ${esc(t.q)} (${G.charLen(t.q)})`), ...(r.endLine ? [`[마무리] ${esc(r.endLine)}`] : []), ...(r.leaks.length ? [`정답 낱말 먼저: ${r.leaks.join(", ")}`] : [])].join("<br>")} | ${r.turns.map((t, j) => `${j + 1}. ${esc(t.a)}`).join("<br>")} | ${esc(markText(r))} | ${r.c.expect.mark.join("/")} | ${r.same ? "같음" : "다름"} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
+    out.push("", summaryText());
+    return out.join("\n");
+  }
+
+  function summaryText() {
+    const same = results.filter((r) => r.same).length;
+    const fb = results.reduce((n, r) => n + r.st.fallbacks, 0);
+    const quiz = results.reduce((n, r) => n + r.quiz, 0);
+    const leak = results.reduce((n, r) => n + r.leaks.length, 0);
+    const long = results.flatMap((r) => r.turns).filter((t) => G.charLen(t.q) > G.MAX_CHARS).length;
+    const err = results.filter((r) => r.st.phase === "error").length;
+    const groups = [...new Set(results.map((r) => r.c.group))].map((g) => {
+      const rs = results.filter((r) => r.c.group === g);
+      return `${g} ${rs.filter((r) => r.same).length}/${rs.length}`;
+    }).join(" · ");
+    return `일치 ${same}/${results.length} (${groups}) · 퀴즈·고르기·사실 묻기 질문 ${quiz}개 · 정답 낱말 먼저 ${leak}번 · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번 · 오류 ${err}건`;
+  }
+
+  async function runAll(list) {
+    $("run").disabled = true; $("copy").disabled = true; $("rows").textContent = ""; results.length = 0;
+    for (let i = 0; i < list.length; i++) {
+      $("summary").textContent = `${i + 1}/${list.length} 실행 중…`;
+      const r = await runCase(list[i]);
+      results.push(r); render(i + 1, r);
+    }
+    $("summary").textContent = summaryText();
+    $("run").disabled = false; $("copy").disabled = false;
+  }
+  window.__detectiveLive = { results, runAll, cases, markdown, summaryText };
+
+  $("run").addEventListener("click", () => runAll(cases));
+  $("copy").addEventListener("click", async () => {
+    const text = markdown();
+    try { await navigator.clipboard.writeText(text); $("summary").textContent = "복사했어요 · " + summaryText(); }
+    catch { const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  });
+})();
+</script>
+</body>
+</html>
