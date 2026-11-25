@@ -432,3 +432,54 @@ test("detectiveHelp: none when all solved without wrong taps; sections carry hid
   assert.ok(h.truth && h.where);
   assert.deepEqual(h.wrongTaps, [{ sentence: FIXTURE[3].sentences[0], reason: "날짜가 이상해요" }, { sentence: FIXTURE[3].sentences[1], reason: "몰라요" }]);
 });
+
+// ---------- 가정 속에 핵심을 넣는 질문 ----------
+// "~다면/~라면" 질문은 따로 한 번 더 검사(AI)합니다. 가정이 바른 생각을 담고 있으면 다시 받습니다.
+const isPremiseCheck = (req) => !!(req.schema && req.schema.properties && req.schema.properties.reveals);
+const HYPO_LEAK = "임시 정부가 아직 없던 때라면 만세 시위는 누가 처음 외쳤을까요?";
+const HYPO_OK = "쌀이 그대로 우리 밥상에 남았다면 살림은 어땠을까요?";
+
+test("isHypothetical spots 다면·라면·려면 questions", () => {
+  assert.equal(D.isHypothetical(HYPO_LEAK), true);
+  assert.equal(D.isHypothetical(HYPO_OK), true);
+  assert.equal(D.isHypothetical("그 문장의 어느 부분이 실제와 다를까요?"), false);
+});
+test("premise: a hypothetical that reveals the answer is checked and asked again", async () => {
+  const llm = fakeLLM([ASK(HYPO_LEAK), { reveals: true }, ASK("그 문장의 어느 부분이 실제와 다를까요?")]);
+  const s = await started(llm);
+  await s.select(1);
+  const st = await s.submitReason("몰라요");
+  assert.equal(llm.calls.length, 3);
+  assert.ok(isPremiseCheck(llm.calls[1]));
+  const checkText = JSON.stringify(llm.calls[1].messages);
+  assert.match(checkText, /임시 정부가 아직 없던 때라면/);
+  assert.match(checkText, /핵심 생각/);
+  assert.match(checkText, /몰라요/); // 학생이 한 말도 함께 봅니다
+  assert.match(userText(llm.calls[2]), /가정/); // 다시 받을 때 까닭을 알려 줌
+  assert.equal(st.question, "그 문장의 어느 부분이 실제와 다를까요?");
+  assert.equal(st.fallbacks, 0);
+});
+test("premise: a hypothetical that only assumes the friend's claim passes", async () => {
+  const llm = fakeLLM([ASK(HYPO_OK), { reveals: false }]);
+  const s = await started(llm);
+  await s.select(1);
+  const st = await s.submitReason("아니에요");
+  assert.equal(llm.calls.length, 2);
+  assert.equal(st.question, HYPO_OK);
+});
+test("premise: a plain question needs no extra check", async () => {
+  const llm = fakeLLM([ASK("그 문장의 어느 부분이 실제와 다를까요?")]);
+  const s = await started(llm);
+  await s.select(1);
+  await s.submitReason("아니에요");
+  assert.equal(llm.calls.length, 1);
+});
+test("premise: if the check itself fails, the hypothetical is not used", async () => {
+  const llm = fakeLLM([ASK(HYPO_LEAK), new Error("check down"), ASK(HYPO_LEAK), { reveals: true }]);
+  const s = await started(llm);
+  await s.select(1);
+  const st = await s.submitReason("몰라요");
+  assert.notEqual(st.question, HYPO_LEAK);
+  assert.equal(st.phase, "asking");
+  assert.equal(st.fallbacks, 1);
+});

@@ -83,6 +83,23 @@
   const NOT_FACT = /다면|라면|려면|었으면|였으면|했으면|까닭|이유|왜|위해/;
   const isFactQuestion = (q) => FACT.test(String(q ?? "")) && !NOT_FACT.test(String(q ?? ""));
 
+  // 가정 질문("~다면/~라면/~려면")은 사실 묻기 검사를 비켜 가므로, 가정 속에 바른 생각을 넣지 않았는지 따로 한 번 더 봅니다.
+  const HYPO = /다면|라면|려면|었으면|였으면|했으면/;
+  const isHypothetical = (q) => HYPO.test(String(q ?? ""));
+  const PREMISE_SCHEMA = {
+    type: "object",
+    properties: { reveals: { type: "boolean" } },
+    required: ["reveals"],
+    additionalProperties: false,
+  };
+  const PREMISE_SYSTEM = `당신은 초등학교 5학년 사회 수업의 질문 검사자입니다. 학생은 친구의 정리에서 틀린 생각이 숨은 문장을 찾아 왜 이상한지 말하고 있습니다. 선생님이 낼 질문 하나에 "~다면", "~라면" 같은 가정이 들어 있습니다.
+가정 부분이 [바른 생각]이나 [핵심 생각]의 내용(또는 그 일부, 같은 뜻의 다른 말 포함)을 담고 있고, 학생이 아직 그 내용을 말하지 않았다면 reveals는 true입니다. 정답을 가정 속에 넣어 알려 주는 셈이기 때문입니다.
+가정이 친구의 숨은 문장(틀린 생각)이 맞다고 쳐 보는 것이거나, 학생이 이미 말한 내용이거나, 정답과 상관없는 내용이면 reveals는 false입니다.
+예: 숨은 문장 "3·1 운동을 이끈 것은 임시 정부였어요", 바른 생각 "임시 정부는 3·1 운동 뒤에 세워졌다"
+- "임시 정부가 아직 없던 때라면 만세 시위는 누가 외쳤을까요?" → true (임시 정부가 아직 없었다는 정답을 가정에 넣음)
+- "임시 정부가 먼저 있었다면 만세 시위를 누가 준비했을까요?" → false (친구의 생각을 맞다고 쳐 봄)
+출력은 JSON 하나만 냅니다.`;
+
   const fail = (reason) => ({ ok: false, reason });
 
   // expect = { stage: "judge"|"final"|"question", asked: string[], leakWords: (string|string[])[], said: string }
@@ -150,7 +167,7 @@
 
 이어 묻는 질문(question) 규칙:
 1. 1문장, 30자 안팎(40자를 넘으면 안 됩니다), "~까요?", "~나요?"처럼 "요?"로 끝나는 존댓말입니다. 질문 안에 마침표나 느낌표를 넣지 않습니다. 앞에서 한 질문을 되풀이하지 않습니다.
-2. 정답을 말하지 않습니다. 바른 생각이나 핵심 생각의 내용, [정답 낱말]은 학생이 먼저 말하기 전에는 질문에 넣지 않습니다(안 됨: 이봉창 문제에서 "도쿄에서 일본 왕을 노린 사람이 이봉창일까요?", "윤봉길은 어디에서 폭탄을 던졌을까요?").
+2. 정답을 말하지 않습니다. 바른 생각이나 핵심 생각의 내용, [정답 낱말]은 학생이 먼저 말하기 전에는 질문에 넣지 않습니다(안 됨: 이봉창 문제에서 "도쿄에서 일본 왕을 노린 사람이 이봉창일까요?", "윤봉길은 어디에서 폭탄을 던졌을까요?"). "~다면", "~라면" 같은 가정 속에도 바른 생각을 넣지 않습니다. 가정은 친구의 숨은 문장이 맞다고 쳐 볼 때만 씁니다(안 됨: "이봉창이 일본에 갔다면 무엇을 했을까요?").
 3. 학생 말을 따라가 스스로 생각하게 합니다. 아니라고만 했으면 "그럼 실제로는 어땠을까요?" 쪽으로, 까닭이 빠졌으면 "왜 그렇게 되었을까요?" 쪽으로 묻습니다. 학생이 이미 꺼낸 말("다른 데서 던졌어요")을 더 말해 보게 하는 것은 좋습니다.
 4. 학생이 "몰라요"라고 하면 같은 것을 다시 묻지 않고, 그 사실을 몰라도 답할 수 있는 더 쉬운 질문으로 바꿉니다. [이어 묻는 질문의 예]를 참고합니다.
 5. 학생이 되물으면 답을 알려 주지 않고 질문을 이어 갑니다.
@@ -231,6 +248,26 @@
       ];
     }
 
+    // 가정 질문의 가정 부분이 바른 생각을 담았는지 AI에게 한 번 더 묻습니다. 검사가 실패하면 쓰지 않는 쪽(true)으로 봅니다.
+    async function premiseReveals(question) {
+      const p = problem();
+      const m = miscById.get(p.misconception);
+      const text = [
+        `[숨은 문장] ${p.sentences[p.hidden]}`,
+        ...(m ? [`[틀린 생각] ${m.wrong}`, `[바른 생각] ${m.truth}`] : []),
+        `[핵심 생각] ${p.key}`,
+        `[학생이 지금까지 한 말] ${said() || "(없음)"}`,
+        `[검사할 질문] ${question}`,
+        "", "가정 부분이 바른 생각·핵심 생각을 미리 알려 주면 reveals를 true로 내세요.",
+      ].join("\n");
+      try {
+        const out = await llm.call({ system: [{ type: "text", text: PREMISE_SYSTEM }], messages: [{ role: "user", content: [{ type: "text", text }] }], schema: PREMISE_SCHEMA });
+        return !(out && out.reveals === false);
+      } catch (e) {
+        return true;
+      }
+    }
+
     // AI를 부르고 검사합니다. 걸리면 까닭을 알려 주고 다시 받습니다(판단 2번, 마지막 판단 3번까지).
     // 판단이 ask인데 질문만 걸렸으면, 다시 받을 때는 형식을 "질문만"으로 좁힙니다(판단이 바뀌어 버리지 않게).
     async function callChecked(stage, task) {
@@ -242,7 +279,12 @@
       for (let attempt = 1; attempt <= tries; attempt++) {
         const out = await llm.call({ system, messages: [{ role: "user", content: buildMessage(task, note) }], schema: schemaFor(shape) });
         if (gen !== generation) throw CANCELLED; // 기다리는 동안 [다음 학생]을 눌렀으면 결과를 버립니다
-        const v = validateDetectiveStep(out, { stage: shape, asked, leakWords: leakWordsFor(problem(), topic), said: said() });
+        let v = validateDetectiveStep(out, { stage: shape, asked, leakWords: leakWordsFor(problem(), topic), said: said() });
+        if (v.ok && out.result === "ask" && isHypothetical(out.question)) {
+          const reveals = await premiseReveals(out.question);
+          if (gen !== generation) throw CANCELLED;
+          if (reveals) v = { ok: false, reason: "가정(~다면/~라면) 속에 바른 생각을 넣었음 — 정답을 알려 주는 셈이니, 가정은 친구의 숨은 문장이 맞다고 칠 때만 쓰거나 가정 없이 물을 것" };
+        }
         if (v.ok) return out;
         if (stage === "judge" && out && out.result === "ask") shape = "question";
         note = `[앞 응답이 검사에 걸렸어요: ${v.reason}] 이 점만 고쳐 다시 내세요.${shape === "question" ? ' result는 "ask"로 두고 질문만 다시 내세요.' : ""}`;
@@ -397,7 +439,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;
