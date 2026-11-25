@@ -48,6 +48,9 @@
   <script src="../data/units.js"></script>
   <script src="../data/topic-3-1.js"></script>
   <script src="../data/topic-3-2.js"></script>
+  <script src="../data/detective-3-1.js" onerror="this.remove()"></script>
+  <script src="../data/detective-3-2.js" onerror="this.remove()"></script>
+  <script src="fixtures/detective-problems.js"></script>
   <script src="../core/guard.js"></script>
   <script src="../core/topic.js"></script>
   <script src="../core/catalog.js"></script>
@@ -79,6 +82,8 @@
   <script src="../methods/elenchus-views.js?v=3"></script>
   <script src="../methods/friend.js?v=9"></script>
   <script src="../methods/friend-views.js?v=7"></script>
+  <script src="../methods/detective.js?v=1"></script>
+  <script src="../methods/detective-views.js?v=1"></script>
   <script src="../core/app.js?v=3"></script>
   <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
   <script>
@@ -173,11 +178,51 @@
         await home();
         await begin(); queue(new Error("연결 실패")); explain(EXPLAIN); await until(() => q(".error-box"), "오류"); snap("error");
       },
+
+      // ---------- 오답 탐정 장면 (천재 12차시, 테스트용 문제 묶음: 문제 1 = 3-2.m06.a 숨은 2번째, 문제 2 = 3-2.m02.a 숨은 3번째) ----------
+      async detective() {
+        window.SokDetectiveData = { fixture: { problems: window.SOK_DETECTIVE_FIXTURE } };
+        Math.random = () => 0;
+        const pick = async (id, value) => { const s = q(id); s.value = value; s.dispatchEvent(new Event("change")); await until(() => q(id) && q(id).value === value, id); };
+        await pick("#method", "detective");
+        await pick("#lesson", "3-12");
+        snap("start");
+        const go = async () => {
+          SokDetective.SERVED.clear();
+          click("시작하기"); await until(() => btn("시작"), "시작 안내");
+        };
+        const card = async (i) => { q(`.dt-card[data-i="${i}"]`).click(); await until(() => q("#reason"), "까닭 칸"); };
+        const reason = (t) => { q("#reason").value = t; click("보내기"); };
+        const ASK = (question) => ({ result: "ask", question });
+        await go(); snap("input");
+        click("시작"); await until(() => q(".dt-card"), "문제"); snap("pick");
+        await card(0); snap("picked");
+        reason("집이 부서진 건 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤"); snap("wrong-1");
+        await card(1); queue("PENDING"); reason("군인만 다친 게 아니에요"); await until(() => q(".thinking"), "생각 중"); snap("waiting");
+        await home();
+        await go(); click("시작"); await until(() => q(".dt-card"), "문제");
+        await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문"); snap("follow");
+        queue(ASK("마을에서 싸움이 나면 누가 다칠까요?")); await answer("몰라요"); await until(() => asking() && asking().textContent.startsWith("마을"), "질문 2");
+        queue({ result: "found" }); await answer("군인이요"); await until(() => btn("다음 문제"), "넘어가기"); snap("between-found");
+        click("다음 문제"); await until(() => q(".dt-card") && !q(".dt-line"), "문제 2");
+        await card(0); reason("날짜가 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤");
+        await card(2); queue({ result: "solved", question: "" }); reason("북한군이 먼저 쳐들어왔어요"); await until(() => btn("결과 보기"), "넘어가기"); snap("between-solved");
+        click("결과 보기"); await until(done, "결과"); snap("result");
+        await home();
+        await go(); click("시작"); await until(() => q(".dt-card"), "문제");
+        await card(0); reason("몰라요"); await until(() => q(".dt-line"), "맞는 문장 뒤");
+        await card(2); reason("몰라요"); await until(() => btn("다음 문제"), "넘어가기"); snap("between-wrong");
+        await home();
+        await go(); click("시작"); await until(() => q(".dt-card"), "문제");
+        await card(1); queue(new Error("연결 실패")); reason("보통 사람도 다쳤어요"); await until(() => q(".error-box"), "오류"); snap("error");
+      },
     };
     // 모르는 친구를 붙인 뒤 엘렌코스 시작 화면은 정리 방법 목록에 한 줄이 늘어난 것만 달라야 합니다.
     const ADJUST = {
       elenchus: { start: (h) => h.replace("엘렌코스 학습정리</option></select>", "엘렌코스 학습정리</option><option value=\"friend\">모르는 친구</option></select>") },
     };
+    // 오답 탐정을 붙인 뒤에는 정리 방법 목록에 한 줄이 더 늘어납니다.
+    ADJUST.elenchus.start = ((before) => (h) => before(h).replace("모르는 친구</option></select>", "모르는 친구</option><option value=\"detective\">오답 탐정</option></select>"))(ADJUST.elenchus.start);
 
     try {
       await SCENES[run]();

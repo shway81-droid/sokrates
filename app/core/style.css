@@ -217,3 +217,44 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   .record::details-content { content-visibility: visible; display: block; }
   .stack > * + * { margin-top: 10px; }
 }
+
+/* 오답 탐정 */
+.dt-guide p { margin: 4px 0; font-size: 28px; }
+.dt-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.dt-head h2 { margin: 0; }
+.dt-lead { margin: 0; font-size: 28px; font-weight: 700; color: var(--ink-soft); }
+.dt-cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.dt-card {
+  display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: start; width: 100%; text-align: left;
+  background: var(--paper); color: var(--ink); border: 3px solid var(--line); border-radius: 16px; padding: 16px 20px;
+  font: inherit; font-family: var(--font-voice); font-size: 32px; line-height: 1.4;
+}
+button.dt-card { cursor: pointer; box-shadow: var(--shadow); }
+button.dt-card:hover:not(:disabled) { border-color: var(--accent); }
+.dt-card .num { font-weight: 800; color: var(--accent); }
+.dt-card.picked { border-color: var(--accent); background: var(--accent-soft); }
+.dt-card.looked { opacity: .45; box-shadow: none; cursor: default; }
+.dt-card.found { border-color: var(--ok); background: var(--ok-soft); }
+.dt-ask { margin: 0; font-size: 32px; }
+.dt-line { font-size: 30px; font-weight: 700; }
+.dt-line.solved { background: var(--ok-soft); color: var(--ok); }
+.dt-line.found { background: var(--accent-soft); color: var(--accent); }
+.dt-line.together { background: var(--amber-soft); color: var(--amber); }
+.dt-mine { font-size: 26px; color: var(--ink-soft); border-left: 6px solid var(--line); padding-left: 20px; }
+.dt-mine p { margin: 4px 0; }
+.dt-mine .k, .dt-reason .k { font-weight: 800; color: var(--accent); margin-right: 12px; }
+.dt-mine .a { color: var(--ink); }
+.dt-reason { margin: 12px 0 0; font-size: 26px; }
+.dt-result .dt-cards { margin-top: 12px; }
+.dt-result .dt-card { font-size: 26px; padding: 10px 16px; box-shadow: none; }
+.mark.dt-solved { background: var(--ok-soft); color: var(--ok); }
+.mark.dt-found { background: var(--accent-soft); color: var(--accent); }
+.mark.dt-together { background: var(--amber-soft); color: var(--amber); }
+@media (max-width: 760px) {
+  .dt-card { font-size: 26px; grid-template-columns: 36px 1fr; }
+  .dt-head { flex-wrap: wrap; }
+}
+@media print {
+  .dt-card { font-size: 12pt; padding: 4px 8px; border-width: 1px; }
+  .dt-reason { font-size: 12pt; }
+}
