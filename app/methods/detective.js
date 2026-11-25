@@ -83,8 +83,12 @@
     const earlier = cands.filter((p) => !isToday(p));
 
     // 안 낸 문제(오개념도 안 나옴) → 안 낸 문제(오개념은 나옴) → 낸 문제 차례. 모두 냈으면 그 무리의 기억을 비우고 다시 돕니다.
-    function choose(group, avoidMisc) {
-      const pool = group.filter((p) => p.misconception !== avoidMisc);
+    // shown: 앞 문제의 문장들. 그 문장에 정답 낱말이 들어 있는 문제는 (다른 문제가 있으면) 내지 않습니다.
+    function choose(group, avoidMisc, shown = []) {
+      const all = group.filter((p) => p.misconception !== avoidMisc);
+      const seen = shown.join(" ").replace(/\s+/g, "");
+      const clean = all.filter((p) => !(p.leakWords || []).some((w) => seen.includes(w.replace(/\s+/g, ""))));
+      const pool = clean.length ? clean : all;
       if (!pool.length) return null;
       if (pool.every((p) => served.has(p.id))) pool.forEach((p) => served.delete(p.id));
       const servedMisc = new Set(problems.filter((p) => served.has(p.id)).map((p) => p.misconception));
@@ -99,7 +103,7 @@
     const first = lessonId == null ? choose(cands, null) : choose(today, null) || choose(earlier, null);
     if (!first) return [];
     const rest = lessonId == null ? cands : earlier;
-    const second = choose(rest, first.misconception) || (lessonId == null ? null : choose(today, first.misconception));
+    const second = choose(rest, first.misconception, first.sentences) || (lessonId == null ? null : choose(today, first.misconception, first.sentences));
     return [first, second].filter(Boolean).slice(0, PROBLEM_COUNT);
   }
 

@@ -110,6 +110,14 @@ test("pick: many students in a row never repeat a misconception within one stude
     assert.notEqual(ps[0].misconception, ps[1].misconception);
   }
 });
+test("pick: second problem avoids one whose answer words appear in the first problem's sentences", () => {
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
+  p08.leakWords = ["이산가족"];
+  p06.sentences[0] = "이 전쟁으로 이산가족이 많이 생겼어요.";
+  const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: null, served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
+});
 test("pick: textbook outside problem.textbooks is skipped", () => {
   for (let i = 0; i < 5; i++) {
     const ps = pick({ textbookId: "icecream", lessonId: "3-12", random: () => i / 5 });
