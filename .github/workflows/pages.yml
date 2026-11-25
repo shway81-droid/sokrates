@@ -31,9 +31,9 @@ jobs:
           cp -r app/core app/data app/methods _site/
           touch _site/.nojekyll
           find _site -type f | sort
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v6
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
