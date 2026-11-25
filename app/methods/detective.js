@@ -103,9 +103,265 @@
     return [first, second].filter(Boolean).slice(0, PROBLEM_COUNT);
   }
 
+  const SYSTEM_PROMPT = `당신은 초등학교 5학년 사회 수업이 끝날 때 "오답 탐정" 활동을 돕는 선생님입니다.
+학생은 친구가 정리한 4문장 가운데 틀린 생각이 숨은 문장을 찾아 눌렀고, 그 문장이 왜 이상한지 까닭을 말했습니다. 당신은 그 까닭을 판단하고, 모자라면 학생이 스스로 생각하게 하는 질문 하나를 냅니다. 학생에게 보이는 것은 질문뿐입니다.
+
+판단(result):
+- "solved": 학생이 숨은 문장에서 이상한 부분을 짚고, 실제로는 어떤지(핵심 생각) 또는 그 까닭을 말했습니다. 덜 자세하거나 낱말이 달라도 뜻이 핵심 생각과 맞으면 solved입니다. 앞의 까닭과 답을 합쳐서 봅니다. 맞춤법과 띄어쓰기는 문제 삼지 않습니다.
+- "ask": 그 밖입니다. "아니에요", "이상해요"처럼 아니라고만 함, "몰라요", 다른 부분을 이상하다고 함, 교과서와 어긋나는 까닭, 되물음, 장난이 여기입니다. 이어 묻는 질문 1개를 함께 냅니다.
+- "found"(마지막 판단에서만): 끝까지 핵심 생각에 닿지 못했습니다. 숨은 문장은 찾았으니 나머지는 선생님이 함께 알아봅니다.
+- 판단 근거는 [문제]의 핵심 생각·바른 생각, [전체 개념], [오늘 차시 교과서 원문](주어졌을 때)뿐입니다. 따로 아는 지식은 쓰지 않습니다.
+
+이어 묻는 질문(question) 규칙:
+1. 1문장, 30자 안팎(40자를 넘으면 안 됩니다), "~까요?", "~나요?"처럼 "요?"로 끝나는 존댓말입니다. 질문 안에 마침표나 느낌표를 넣지 않습니다. 앞에서 한 질문을 되풀이하지 않습니다.
+2. 정답을 말하지 않습니다. 바른 생각이나 핵심 생각의 내용, [정답 낱말]은 학생이 먼저 말하기 전에는 질문에 넣지 않습니다(안 됨: 이봉창 문제에서 "도쿄에서 일본 왕을 노린 사람이 이봉창일까요?", "윤봉길은 어디에서 폭탄을 던졌을까요?").
+3. 학생 말을 따라가 스스로 생각하게 합니다. 아니라고만 했으면 "그럼 실제로는 어땠을까요?" 쪽으로, 까닭이 빠졌으면 "왜 그렇게 되었을까요?" 쪽으로 묻습니다. 학생이 이미 꺼낸 말("다른 데서 던졌어요")을 더 말해 보게 하는 것은 좋습니다.
+4. 학생이 "몰라요"라고 하면 같은 것을 다시 묻지 않고, 그 사실을 몰라도 답할 수 있는 더 쉬운 질문으로 바꿉니다. [이어 묻는 질문의 예]를 참고합니다.
+5. 학생이 되물으면 답을 알려 주지 않고 질문을 이어 갑니다.
+6. 퀴즈를 내지 않습니다. 이름, 연도, 장소, 숫자를 맞히게 하는 질문("~의 이름은 무엇일까요?", "몇 년이었을까요?")은 쓰지 않습니다. "~일까요, ~일까요?"처럼 둘 중 하나를 고르게 하는 질문도 쓰지 않습니다.
+7. 5학년이 아는 쉬운 낱말을 씁니다. "정답은", "오답" 같은 말과 학생이 잘못했다는 느낌을 주는 말은 쓰지 않습니다.
+8. 출력은 주어진 JSON 형식 하나만 냅니다. solved면 question은 ""입니다.
+
+예시(이봉창 문제, 숨은 문장 "이봉창은 상하이 훙커우 공원에서 폭탄을 던졌어요.", 핵심 생각 "이봉창은 도쿄에서 일본 왕을 향해 폭탄을 던졌다"):
+- 학생 까닭 "이봉창이 아니에요" → ask, question "그럼 이봉창은 어떤 일을 했을까요?"
+- 학생 답 "몰라요" → ask. "이봉창은 누구를 향해 폭탄을 던졌을까요?"는 퀴즈라 안 됨. "그 문장에서 어느 낱말이 가장 이상해 보였나요?"처럼 몰라도 답할 수 있는 쉬운 질문
+- 학생 답 "이봉창은 일본에 가서 일본 왕한테 던졌어요" → solved`;
+
+  const CANCELLED = Symbol("cancelled");
+  // 같은 차시 학생들에게 같은 문제가 되풀이되지 않게, 페이지가 열려 있는 동안 "교과서|차시"마다 낸 문제를 기억합니다(저장하지 않음).
+  const SERVED = new Map();
+  function servedFor(textbookId, lessonId) {
+    const key = `${textbookId}|${lessonId ?? "wrap"}`;
+    if (!SERVED.has(key)) SERVED.set(key, new Set());
+    return SERVED.get(key);
+  }
+  // 브라우저에서는 data/detective-*.js 가 root.SokDetectiveData 에 넣은 문제를 모두 씁니다.
+  const allProblems = () => (isNode ? [] : Object.values(root.SokDetectiveData || {}).flatMap((d) => d.problems || []));
+
+  const newRecord = (p) => ({ problemId: p.id, wrongTaps: [], reason: null, turns: [], mark: null });
+
+  // 오늘 차시 교과서 원문이 있으면 시스템 프롬프트 뒤에 붙이고 캐시합니다(엘렌코스·모르는 친구와 같은 차례).
+  function systemFor(sourceText) {
+    const text = typeof sourceText === "string" ? sourceText.trim() : "";
+    if (!text) return SYSTEM_PROMPT;
+    return [
+      { type: "text", text: SYSTEM_PROMPT },
+      { type: "text", text: `[오늘 차시 교과서 원문]\n${text}`, cache_control: { type: "ephemeral" } },
+    ];
+  }
+
+  function createSession({ topic, textbookId, lessonId = null, llm, sourceText = null, problems = allProblems(),
+    problemIds = null, random = Math.random, served = null }) {
+    const picked = problemIds
+      ? problemIds.map((id) => problems.find((p) => p.id === id)).filter(Boolean)
+      : pickProblems({ problems, topic, textbookId, lessonId, served: served || servedFor(textbookId, lessonId), random });
+    const context = T.buildContext(topic, textbookId, lessonId);
+    const system = systemFor(sourceText);
+    const miscById = new Map(topic.misconceptions.map((m) => [m.id, m]));
+    const initialState = () => ({
+      phase: "input", problems: JSON.parse(JSON.stringify(picked)), index: 0, step: "pick", selected: null, line: null,
+      question: null, records: [], error: null,
+      fallbacks: 0, // 검사에 걸려 기본값으로 대신한 횟수(점검 페이지가 봅니다)
+    });
+    let state = initialState();
+    let generation = 0; // cancel() 때마다 올려서 늦게 온 응답을 버립니다
+    let lastAction = null;
+
+    const snapshot = () => JSON.parse(JSON.stringify(state));
+    const problem = () => state.problems[state.index];
+    const record = () => state.records[state.index];
+    const said = () => [record().reason, ...record().turns.map((t) => t.a)].filter(Boolean).join(" ");
+
+    // 첫 블록(단원 맥락)은 같은 차시 동안 늘 같아서 캐시하고, 둘째 블록에는 이 문제와 학생의 말만 둡니다.
+    // 학생이 맞는 문장을 눌렀던 기록은 보내지 않습니다(판단은 숨은 문장의 까닭만 봅니다).
+    function buildMessage(task, note = "") {
+      const p = problem();
+      const r = record();
+      const m = miscById.get(p.misconception);
+      const lines = [`[문제] 친구의 정리`, ...p.sentences.map((s, i) => `${i + 1}. ${s}`), `숨은 문장: ${p.hidden + 1}번`];
+      if (m) lines.push(`틀린 생각(오개념 ${m.id}): ${m.wrong}`, `바른 생각: ${m.truth}`);
+      lines.push(`핵심 생각(판단 기준): ${p.key}`, `이어 묻는 질문의 예: ${p.hints.join(" / ")}`,
+        `[정답 낱말] 학생이 먼저 말하기 전에는 질문에 쓰지 말 것: ${p.leakWords.join(", ")}`,
+        "", "[학생의 까닭]", r.reason);
+      if (r.turns.length) {
+        lines.push("", "[이어 묻는 질문과 답]");
+        r.turns.forEach((t, i) => lines.push(`질문${i + 1}: ${t.q}`, `학생 답${i + 1}: ${t.a}`));
+      }
+      lines.push("", `지금 할 일: ${task}`);
+      if (note) lines.push("", note);
+      return [
+        { type: "text", text: context, cache_control: { type: "ephemeral" } },
+        { type: "text", text: lines.join("\n") },
+      ];
+    }
+
+    // AI를 부르고 검사합니다. 걸리면 까닭을 알려 주고 다시 받습니다(판단 2번, 마지막 판단 3번까지).
+    // 판단이 ask인데 질문만 걸렸으면, 다시 받을 때는 형식을 "질문만"으로 좁힙니다(판단이 바뀌어 버리지 않게).
+    async function callChecked(stage, task) {
+      const gen = generation;
+      const asked = record().turns.map((t) => t.q);
+      const tries = stage === "final" ? 3 : 2;
+      let shape = stage;
+      let note = "";
+      for (let attempt = 1; attempt <= tries; attempt++) {
+        const out = await llm.call({ system, messages: [{ role: "user", content: buildMessage(task, note) }], schema: schemaFor(shape) });
+        if (gen !== generation) throw CANCELLED; // 기다리는 동안 [다음 학생]을 눌렀으면 결과를 버립니다
+        const v = validateDetectiveStep(out, { stage: shape, asked, leakWords: problem().leakWords, said: said() });
+        if (v.ok) return out;
+        if (stage === "judge" && out && out.result === "ask") shape = "question";
+        note = `[앞 응답이 검사에 걸렸어요: ${v.reason}] 이 점만 고쳐 다시 내세요.${shape === "question" ? ' result는 "ask"로 두고 질문만 다시 내세요.' : ""}`;
+      }
+      state.fallbacks++;
+      return null;
+    }
+
+    function close(mark) {
+      record().mark = mark;
+      Object.assign(state, { step: "between", line: LINES[mark === "together" ? "wrongLast" : mark], question: null, selected: null });
+    }
+
+    async function doJudge() {
+      const left = MAX_FOLLOW - record().turns.length;
+      const out = await callChecked("judge", `result "solved" 또는 "ask"를 내세요. 학생의 까닭(과 답)이 핵심 생각에 닿았으면 "solved", 아니면 "ask"와 이어 묻는 질문 1개입니다. 남은 이어 묻는 질문은 이것까지 ${left}번입니다.`);
+      if (out && out.result === "solved") return close("solved");
+      let q = out ? out.question.trim() : null;
+      if (!q) { // 기본 질문은 앞에서 한 질문과 겹치지 않게 고릅니다.
+        const asked = new Set(record().turns.map((t) => squash(t.q)));
+        q = DEFAULT_QUESTIONS.find((d) => !asked.has(squash(d))) || DEFAULT_QUESTIONS[0];
+      }
+      Object.assign(state, { step: "follow", question: q, line: null });
+    }
+
+    async function doFinal() {
+      const out = await callChecked("final", '마지막 판단입니다. result "solved" 또는 "found"를 내세요. 학생의 까닭과 답을 모두 합쳐 핵심 생각에 닿았으면 "solved", 아니면 "found"입니다.');
+      close(out ? out.result : "found");
+    }
+
+    // action을 실행합니다. 처리 중 표시, 오류 처리, 취소된 세션의 늦은 응답 버리기를 맡습니다.
+    async function run(action) {
+      lastAction = action;
+      state.phase = "waiting";
+      state.error = null;
+      try {
+        await action();
+        state.phase = "asking";
+      } catch (e) {
+        if (e === CANCELLED) return snapshot();
+        state.phase = "error";
+        state.error = ERROR_MESSAGE;
+        if (root && root.console) root.console.warn("[오답 탐정] AI 호출 실패:", e && e.message);
+      }
+      return snapshot();
+    }
+
+    const picking = () => state.phase === "asking" && state.step === "pick";
+
+    return {
+      getState: snapshot,
+
+      async start() {
+        if (state.phase !== "input") return snapshot();
+        if (!state.problems.length) { state.phase = "done"; return snapshot(); }
+        state.records.push(newRecord(problem()));
+        Object.assign(state, { phase: "asking", step: "pick" });
+        return snapshot();
+      },
+
+      // 카드 누르기. 살펴본(이미 보낸) 맞는 문장은 다시 누를 수 없습니다. 어느 카드를 눌러도 화면은 같습니다.
+      async select(i) {
+        if (!picking() || !Number.isInteger(i) || i < 0 || i >= problem().sentences.length) return snapshot();
+        if (record().wrongTaps.some((w) => w.index === i)) return snapshot();
+        Object.assign(state, { selected: i, line: null });
+        return snapshot();
+      },
+
+      async submitReason(text) {
+        if (!picking() || state.selected == null) return snapshot();
+        const t = String(text ?? "").trim();
+        if (!t) return snapshot();
+        const r = record();
+        if (state.selected !== problem().hidden) {
+          // 맞는 문장: AI를 부르지 않고 학생의 생각을 적어 둡니다(선생님 도움말에 나감).
+          r.wrongTaps.push({ index: state.selected, reason: t });
+          state.selected = null;
+          if (r.wrongTaps.length >= MAX_WRONG) close("together");
+          else state.line = LINES.wrongFirst;
+          return snapshot();
+        }
+        r.reason = t;
+        return run(doJudge);
+      },
+
+      async submitAnswer(text) {
+        if (state.phase !== "asking" || state.step !== "follow") return snapshot();
+        const a = String(text ?? "").trim();
+        if (!a) return snapshot();
+        record().turns.push({ q: state.question, a });
+        return run(record().turns.length >= MAX_FOLLOW ? doFinal : doJudge);
+      },
+
+      async next() {
+        if (state.phase !== "asking" || state.step !== "between") return snapshot();
+        if (state.index + 1 >= state.problems.length) { state.phase = "done"; return snapshot(); }
+        state.index++;
+        state.records.push(newRecord(problem()));
+        Object.assign(state, { step: "pick", selected: null, line: null, question: null });
+        return snapshot();
+      },
+
+      // [바로 정리하기]: 하던 문제는 까닭을 보냈으면 found, 아니면 together. 시작하지 않은 문제는 결과에 나오지 않습니다.
+      async finishNow() {
+        if (state.phase !== "asking") return snapshot();
+        const r = record();
+        if (r && !r.mark) r.mark = r.reason != null ? "found" : "together";
+        Object.assign(state, { phase: "done", selected: null, question: null, line: null });
+        return snapshot();
+      },
+
+      async retry() {
+        if (state.phase !== "error" || !lastAction) return snapshot();
+        return run(lastAction);
+      },
+
+      cancel() {
+        generation++;
+        state = initialState();
+      },
+    };
+  }
+
+  const NUM = ["①", "②", "③", "④"];
+  const shown = (r) => r.mark === "solved" || r.mark === "found"; // 학생이 찾은 문제만 숨은 문장을 표시합니다
+
+  // 복사용 결과 글
+  function resultText({ topicTitle, textbookName, dateStr, state }) {
+    const lines = [`[오답 탐정 학습정리] ${topicTitle} · ${textbookName} · ${dateStr}`];
+    state.records.forEach((r, i) => {
+      const p = state.problems[i];
+      lines.push("", `문제 ${i + 1}${r.mark ? ` (${MARK_TEXT[r.mark]})` : ""}`);
+      p.sentences.forEach((s, j) => lines.push(`${NUM[j]} ${s}${shown(r) && j === p.hidden ? "  ← 찾은 문장" : ""}`));
+      if (r.reason) lines.push(`나의 까닭: ${r.reason}`);
+      r.turns.forEach((t) => lines.push(`질문: ${t.q}`, `답: ${t.a}`));
+    });
+    return lines.join("\n");
+  }
+
+  // 까닭까지 밝히지 못했거나 맞는 문장을 이상하다고 본 문제마다 선생님 도움말 한 묶음.
+  function detectiveHelp(topic, textbookId, state, lessonId = null) {
+    const U = isNode ? require("../core/ui.js") : root.SokUI;
+    const sections = (state.records || []).map((r, i) => {
+      const p = state.problems[i];
+      if (r.mark === "solved" && !r.wrongTaps.length) return null;
+      const base = U.helpFor(topic, textbookId, { item: p.sentences[p.hidden], misconception: p.misconception, lessonId });
+      if (!base) return null;
+      return { ...base, itemLabel: "숨은 문장", wrongTaps: r.wrongTaps.map((w) => ({ sentence: p.sentences[w.index], reason: w.reason })) };
+    }).filter(Boolean);
+    return sections.length ? { sections } : null;
+  }
+
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    schemaFor, validateDetectiveStep, isChoice, leakIn, pickProblems,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, leakIn, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;
