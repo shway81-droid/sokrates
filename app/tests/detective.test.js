@@ -103,6 +103,19 @@ test("prompt examples do not teach the fact-recall form", () => {
   for (const l of good) assert.equal(D.isFactQuestion(l.match(/question "([^"]+)"/)[1]), false, l);
 });
 
+test("prompt: no example question starts with 그럼, and the rules say so", () => {
+  const qs = D.SYSTEM_PROMPT.match(/"[^"]*요\?"/g) || [];
+  assert.ok(qs.length > 5);
+  for (const q of qs) assert.doesNotMatch(q, /^"그럼/, q);
+  assert.match(D.SYSTEM_PROMPT, /"그럼"으로 시작하지 않습니다/);
+});
+test("prompt: the 몰라요 example offers several easy questions and says not to copy them", () => {
+  const line = D.SYSTEM_PROMPT.split(/\r?\n/).find((l) => l.startsWith('- 학생 답 "몰라요"'));
+  const good = (line.split("처럼")[0].match(/"[^"]*요\?"/g) || []).filter((q) => !/누구를 향해/.test(q));
+  assert.ok(good.length >= 3, line);
+  for (const q of good) assert.equal(D.isFactQuestion(q.slice(1, -1)), false, q);
+  assert.match(D.SYSTEM_PROMPT, /그대로 (쓰지|베끼지) 않/);
+});
 test("leak check: a synonym group is blocked until the student says any member", () => {
   const groups = [["정전", "정전 협정", "휴전 협정"]];
   assert.equal(D.leakIn("휴전 협정을 맺은 뒤 전쟁은 어떻게 되었을까요?", groups, "끝난 게 아니에요"), "휴전 협정");
