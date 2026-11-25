@@ -47,11 +47,7 @@
         ]);
       })));
 
-      if (st.turns.length) {
-        parts.push(el("div", { class: "history" }, st.turns.flatMap((t, i) => [
-          el("p", { text: `질문 ${i + 1}. ${t.q}` }), el("p", { class: "a", text: `→ ${t.a}` }),
-        ])));
-      }
+      parts.push(P.thread(WHO, st.turns));
 
       const dots = () => P.dots(st.turns.length + 1, st.maxQuestions);
       if (st.phase === "waiting") parts.push(P.thinkingCard(WHO, st.mode ? dots() : null));

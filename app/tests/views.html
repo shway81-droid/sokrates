@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>화면 확인 (가짜 AI)</title>
-  <link rel="stylesheet" href="../core/style.css?v=3">
+  <link rel="stylesheet" href="../core/style.css?v=4">
   <style>
     #harness { margin: 24px; padding: 16px; border: 3px dashed #999; font: 16px/1.5 monospace; background: #fff; color: #222; }
     #harness pre { white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; }
@@ -77,15 +77,15 @@
     delete window.SOKRATES_TEXTS;
   </script>
   <script src="../core/ui.js?v=3"></script>
-  <script src="../core/parts.js?v=4"></script>
+  <script src="../core/parts.js?v=5"></script>
   <script src="../methods/elenchus.js"></script>
-  <script src="../methods/elenchus-views.js?v=3"></script>
+  <script src="../methods/elenchus-views.js?v=4"></script>
   <script src="../methods/friend.js?v=9"></script>
-  <script src="../methods/friend-views.js?v=7"></script>
+  <script src="../methods/friend-views.js?v=8"></script>
   <script src="../methods/detective.js?v=12"></script>
-  <script src="../methods/detective-views.js?v=2"></script>
+  <script src="../methods/detective-views.js?v=3"></script>
   <script src="../core/app.js?v=3"></script>
-  <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
+  <script src="fixtures/elenchus-views-baseline.js?v=2" onerror="this.remove()"></script>
   <script>
   (async function () {
     const $ = (id) => document.getElementById(id);
@@ -236,12 +236,9 @@
         if (!/선생님과 함께 더 알아봐요/.test(q(".dt-line").textContent)) throw new Error("모르겠어요 뒤 마무리 문구가 다름");
       },
     };
-    // 모르는 친구를 붙인 뒤 엘렌코스 시작 화면은 정리 방법 목록에 한 줄이 늘어난 것만 달라야 합니다.
-    const ADJUST = {
-      elenchus: { start: (h) => h.replace("엘렌코스 학습정리</option></select>", "엘렌코스 학습정리</option><option value=\"friend\">모르는 친구</option></select>") },
-    };
-    // 오답 탐정을 붙인 뒤에는 정리 방법 목록에 한 줄이 더 늘어납니다.
-    ADJUST.elenchus.start = ((before) => (h) => before(h).replace("모르는 친구</option></select>", "모르는 친구</option><option value=\"detective\">오답 탐정</option></select>"))(ADJUST.elenchus.start);
+    // 기준값과 지금 화면 사이에 일부러 생긴 차이를 맞추는 곳입니다. 차분한 튜터 디자인으로 기준값을 새로 찍어 지금은 비어 있습니다.
+    // 예) const ADJUST = { elenchus: { start: (h) => h.replace("옛 글", "새 글") } };
+    const ADJUST = {};
 
     try {
       await SCENES[run]();

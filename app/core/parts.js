@@ -14,8 +14,28 @@
       Array.from({ length: max }, (_, i) => el("i", { class: i < done ? "on" : null })));
   }
 
+  // 말풍선 옆 동그라미 그림. 방법마다 다릅니다(코드에 박힌 그림이라 innerHTML로 넣습니다).
+  const AVATAR_SVG = {
+    "모르는 친구": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2"/><path d="M9 9.5h.01M15 9.5h.01"/></svg>',
+    "오답 탐정": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5 5"/></svg>',
+  };
+  function avatar(who) {
+    const a = el("span", { class: "avatar", "aria-hidden": "true" });
+    if (AVATAR_SVG[who]) a.innerHTML = AVATAR_SVG[who]; else a.textContent = "?";
+    return a;
+  }
+  // AI 말풍선 한 줄: 그림 + 말풍선. cls는 말풍선에 더할 이름(지금 질문은 "qcard").
+  const aiRow = (who, cls, children) => el("div", { class: "bubble-row ai" }, [avatar(who), el("div", { class: `bubble ${cls}` }, children)]);
+  const meRow = (text) => el("div", { class: "bubble-row me" }, [el("div", { class: "bubble a", text })]);
+
+  // 지난 문답을 말풍선 대화로 보여 줍니다. turns: [{ q, a }]
+  function thread(who, turns) {
+    if (!turns || !turns.length) return null;
+    return el("div", { class: "history" }, turns.flatMap((t) => [aiRow(who, "past", [el("p", { text: t.q })]), meRow(t.a)]));
+  }
+
   function thinkingCard(who, dotsEl) {
-    return el("div", { class: "qcard" }, [
+    return aiRow(who, "qcard", [
       el("div", { class: "who" }, [el("span", { text: who }), dotsEl || null]),
       el("div", { class: "thinking" }, [el("span", { text: "생각하는 중이에요" }),
         el("span", { class: "pulse", "aria-hidden": "true" }, [el("i"), el("i"), el("i")])]),
@@ -24,26 +44,25 @@
 
   // extra: 질문 위에 붙는 작은 글(모르는 친구의 반응). 없으면 넣지 않습니다.
   function questionCard(who, dotsEl, question, extra = null) {
-    return el("div", { class: "qcard" }, [
+    return aiRow(who, "qcard", [
       el("div", { class: "who" }, [el("span", { text: who }), dotsEl]),
       extra ? el("div", { class: "reaction", text: extra }) : null,
       el("div", { class: "q", text: question }),
     ]);
   }
 
-  // 답 칸과 [바로 정리하기] [보내기]. send(text)·finish()는 세션 동작의 promise를 돌려줍니다.
+  // 답 칸과 [보내기], 그 아래 작은 [바로 정리하기]. send(text)·finish()는 세션 동작의 promise를 돌려줍니다.
   function answerArea(kit, { send, finish }) {
-    const answer = el("textarea", { rows: 2, id: "answer", "data-autofocus": true, "aria-label": "학생의 답", placeholder: "학생의 답을 적어 주세요" });
-    const sendBtn = el("button", { class: "btn", type: "button", text: "보내기" });
+    const answer = el("textarea", { rows: 1, id: "answer", "data-autofocus": true, "aria-label": "학생의 답", placeholder: "학생의 답을 적어 주세요" });
+    const sendBtn = el("button", { class: "btn send", type: "button", text: "보내기" });
     const submit = () => {
       if (!answer.value.trim()) { answer.focus(); return; }
       kit.act(send(answer.value));
     };
     sendBtn.addEventListener("click", submit);
     answer.addEventListener("keydown", kit.onEnter(submit));
-    return [answer, el("div", { class: "row end" }, [
+    return [el("div", { class: "composer" }, [answer, sendBtn]), el("div", { class: "row end" }, [
       el("button", { class: "btn quiet", type: "button", text: "바로 정리하기", onclick: () => kit.act(finish()) }),
-      sendBtn,
     ])];
   }
 
@@ -91,5 +110,5 @@
     ]);
   }
 
-  root.SokParts = { goal, dots, thinkingCard, questionCard, answerArea, errorArea, helperBox, helpLines, recordBox, resultActions };
+  root.SokParts = { goal, dots, avatar, thread, thinkingCard, questionCard, answerArea, errorArea, helperBox, helpLines, recordBox, resultActions };
 })(this);

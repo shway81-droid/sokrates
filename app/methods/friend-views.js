@@ -29,13 +29,10 @@
     talk(kit) {
       const s = kit.session;
       const st = s.getState();
-      const parts = [explainBox(st.explanation)];
+      // 문답 화면에서는 학생의 설명을 첫 말풍선(오른쪽)으로 보여 줍니다.
+      const parts = [el("div", { class: "bubble-row me" }, [el("div", { class: "bubble a" }, [el("span", { class: "k", text: "나의 설명" }), el("span", { text: st.explanation })])])];
 
-      if (st.turns.length) {
-        parts.push(el("div", { class: "history" }, st.turns.flatMap((t, i) => [
-          el("p", { text: `질문 ${i + 1}. ${t.q}` }), el("p", { class: "a", text: `→ ${t.a}` }),
-        ])));
-      }
+      parts.push(P.thread(WHO, st.turns));
 
       const dots = () => P.dots(st.turns.length + 1, st.maxQuestions);
       if (st.phase === "waiting") parts.push(P.thinkingCard(WHO, dots()));

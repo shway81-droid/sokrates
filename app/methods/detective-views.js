@@ -54,15 +54,18 @@
       const canPick = st.phase === "asking" && st.step === "pick";
       const parts = [
         P.goal(kit.scope.lessonTitle),
-        el("div", { class: "dt-head" }, [el("p", { class: "dt-lead", text: "친구가 배운 것을 이렇게 정리했어요. 한 곳이 이상해요." }), dots()]),
+        el("div", { class: "dt-head" }, [
+          el("div", { class: "bubble-row ai" }, [P.avatar(WHO), el("div", { class: "bubble past" }, [el("p", { class: "dt-lead", text: "친구가 배운 것을 이렇게 정리했어요. 한 곳이 이상해요." })])]),
+          dots(),
+        ]),
         cards(p, st.step === "pick" ? { ...r, reason: null } : r, { selected: st.selected, onPick: canPick ? (i) => kit.act(s.select(i)) : null }),
       ];
 
       // 숨은 문장을 찾은 뒤에는 학생이 쓴 까닭과 앞의 문답을 작게 보여 줍니다.
       if (r && r.reason != null && st.step !== "pick") {
         parts.push(el("div", { class: "dt-mine" }, [
-          el("p", {}, [el("span", { class: "k", text: "나의 까닭" }), el("span", { text: r.reason })]),
-          ...r.turns.flatMap((t) => [el("p", { text: t.q }), el("p", { class: "a", text: `→ ${t.a}` })]),
+          el("div", { class: "bubble-row me" }, [el("div", { class: "bubble a" }, [el("span", { class: "k", text: "나의 까닭" }), el("span", { text: r.reason })])]),
+          P.thread(WHO, r.turns),
         ]));
       }
 
@@ -82,8 +85,10 @@
             kit.act(s.submitReason(box.value));
           };
           box.addEventListener("keydown", kit.onEnter(send));
-          parts.push(el("h2", { class: "dt-ask", text: "이 문장이 왜 이상한가요?" }), box,
-            el("div", { class: "row end" }, [finishBtn(kit), el("button", { class: "btn", type: "button", text: "보내기", onclick: send })]));
+          parts.push(
+            el("div", { class: "bubble-row ai" }, [P.avatar(WHO), el("div", { class: "bubble ask" }, [el("h2", { class: "dt-ask", text: "이 문장이 왜 이상한가요?" })])]),
+            el("div", { class: "composer" }, [box, el("button", { class: "btn send", type: "button", text: "보내기", onclick: send })]),
+            el("div", { class: "row end" }, [finishBtn(kit)]));
         } else {
           parts.push(el("div", { class: "row end" }, [finishBtn(kit)]));
         }
