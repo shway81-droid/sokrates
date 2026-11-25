@@ -435,7 +435,7 @@ test("detectiveHelp: none when all solved without wrong taps; sections carry hid
 
 // ---------- 가정 속에 핵심을 넣는 질문 ----------
 // "~다면/~라면" 질문은 따로 한 번 더 검사(AI)합니다. 가정이 바른 생각을 담고 있으면 다시 받습니다.
-const isPremiseCheck = (req) => !!(req.schema && req.schema.properties && req.schema.properties.reveals);
+const isPremiseCheck = (req) => !!(req.schema && req.schema.properties && req.schema.properties.side);
 const HYPO_LEAK = "임시 정부가 아직 없던 때라면 만세 시위는 누가 처음 외쳤을까요?";
 const HYPO_OK = "쌀이 그대로 우리 밥상에 남았다면 살림은 어땠을까요?";
 
@@ -445,7 +445,7 @@ test("isHypothetical spots 다면·라면·려면 questions", () => {
   assert.equal(D.isHypothetical("그 문장의 어느 부분이 실제와 다를까요?"), false);
 });
 test("premise: a hypothetical that reveals the answer is checked and asked again", async () => {
-  const llm = fakeLLM([ASK(HYPO_LEAK), { reveals: true }, ASK("그 문장의 어느 부분이 실제와 다를까요?")]);
+  const llm = fakeLLM([ASK(HYPO_LEAK), { premise: "임시 정부가 아직 없던 때", side: "truth" }, ASK("그 문장의 어느 부분이 실제와 다를까요?")]);
   const s = await started(llm);
   await s.select(1);
   const st = await s.submitReason("몰라요");
@@ -460,7 +460,7 @@ test("premise: a hypothetical that reveals the answer is checked and asked again
   assert.equal(st.fallbacks, 0);
 });
 test("premise: a hypothetical that only assumes the friend's claim passes", async () => {
-  const llm = fakeLLM([ASK(HYPO_OK), { reveals: false }]);
+  const llm = fakeLLM([ASK(HYPO_OK), { premise: "쌀이 그대로 우리 밥상에 남음", side: "friend" }]);
   const s = await started(llm);
   await s.select(1);
   const st = await s.submitReason("아니에요");
@@ -475,11 +475,28 @@ test("premise: a plain question needs no extra check", async () => {
   assert.equal(llm.calls.length, 1);
 });
 test("premise: if the check itself fails, the hypothetical is not used", async () => {
-  const llm = fakeLLM([ASK(HYPO_LEAK), new Error("check down"), ASK(HYPO_LEAK), { reveals: true }]);
+  const llm = fakeLLM([ASK(HYPO_LEAK), new Error("check down"), ASK(HYPO_LEAK), { premise: "임시 정부가 아직 없던 때", side: "truth" }]);
   const s = await started(llm);
   await s.select(1);
   const st = await s.submitReason("몰라요");
   assert.notEqual(st.question, HYPO_LEAK);
   assert.equal(st.phase, "asking");
   assert.equal(st.fallbacks, 1);
+});
+test("premise check: the AI names the assumed situation and whose side it is on", () => {
+  const sch = D.PREMISE_SCHEMA;
+  assert.deepEqual(sch.properties.side.enum, ["friend", "truth", "other"]);
+  assert.deepEqual([...sch.required].sort(), ["premise", "side"]);
+  // 친구 생각을 따라간 반사실 가정("그대로 남았다면")은 friend 쪽이라고 예로 가르칩니다.
+  assert.match(D.PREMISE_SYSTEM, /그대로 우리 밥상에 남았다면[^\n]*friend/);
+});
+test("premise: side 'other' passes, a malformed check answer does not", async () => {
+  const llm = fakeLLM([ASK(HYPO_OK), { premise: "비가 왔다면", side: "other" }]);
+  const s = await started(llm);
+  await s.select(1);
+  assert.equal((await s.submitReason("아니에요")).question, HYPO_OK);
+  const llm2 = fakeLLM([ASK(HYPO_OK), { premise: "?" }, ASK("그 문장의 어느 부분이 실제와 다를까요?")]);
+  const s2 = await started(llm2);
+  await s2.select(1);
+  assert.equal((await s2.submitReason("아니에요")).question, "그 문장의 어느 부분이 실제와 다를까요?");
 });

@@ -86,18 +86,28 @@
   // 가정 질문("~다면/~라면/~려면")은 사실 묻기 검사를 비켜 가므로, 가정 속에 바른 생각을 넣지 않았는지 따로 한 번 더 봅니다.
   const HYPO = /다면|라면|려면|었으면|였으면|했으면/;
   const isHypothetical = (q) => HYPO.test(String(q ?? ""));
+  // 검사 AI는 먼저 가정이 그리는 상황(premise)을 적고, 그 상황이 누구 편인지(side) 고릅니다. truth일 때만 막습니다.
   const PREMISE_SCHEMA = {
     type: "object",
-    properties: { reveals: { type: "boolean" } },
-    required: ["reveals"],
+    properties: {
+      premise: { type: "string" },
+      side: { type: "string", enum: ["friend", "truth", "other"] },
+    },
+    required: ["premise", "side"],
     additionalProperties: false,
   };
   const PREMISE_SYSTEM = `당신은 초등학교 5학년 사회 수업의 질문 검사자입니다. 학생은 친구의 정리에서 틀린 생각이 숨은 문장을 찾아 왜 이상한지 말하고 있습니다. 선생님이 낼 질문 하나에 "~다면", "~라면" 같은 가정이 들어 있습니다.
-가정 부분이 [바른 생각]이나 [핵심 생각]의 내용(또는 그 일부, 같은 뜻의 다른 말 포함)을 담고 있고, 학생이 아직 그 내용을 말하지 않았다면 reveals는 true입니다. 정답을 가정 속에 넣어 알려 주는 셈이기 때문입니다.
-가정이 친구의 숨은 문장(틀린 생각)이 맞다고 쳐 보는 것이거나, 학생이 이미 말한 내용이거나, 정답과 상관없는 내용이면 reveals는 false입니다.
-예: 숨은 문장 "3·1 운동을 이끈 것은 임시 정부였어요", 바른 생각 "임시 정부는 3·1 운동 뒤에 세워졌다"
-- "임시 정부가 아직 없던 때라면 만세 시위는 누가 외쳤을까요?" → true (임시 정부가 아직 없었다는 정답을 가정에 넣음)
-- "임시 정부가 먼저 있었다면 만세 시위를 누가 준비했을까요?" → false (친구의 생각을 맞다고 쳐 봄)
+1. premise: 가정 부분이 그리는 상황을 짧게 적습니다("~다면"을 뺀 내용 그대로).
+2. side: 그 상황이 어느 쪽 이야기인지 고릅니다.
+- "friend": 그 상황이 친구의 숨은 문장(틀린 생각)과 같은 쪽이거나 거기서 나오는 일입니다. 친구 말이 맞다고 쳐 보는 가정입니다. "그대로", "정말", "만약" 같은 말이 붙어 실제는 다르다는 느낌이 들어도, 가정한 상황 자체가 친구 쪽이면 friend입니다.
+- "truth": 그 상황이 [바른 생각]이나 [핵심 생각]의 내용(또는 그 일부, 같은 뜻의 다른 말)이고, 학생이 아직 그 내용을 말하지 않았습니다. 정답을 가정 속에 넣어 알려 주는 셈입니다.
+- "other": 둘 다 아니거나, 학생이 이미 말한 내용입니다.
+예 1: 숨은 문장 "3·1 운동을 이끈 것은 임시 정부였어요", 바른 생각 "임시 정부는 3·1 운동 뒤에 세워졌다"
+- "임시 정부가 아직 없던 때라면 만세 시위는 누가 외쳤을까요?" → truth (임시 정부가 아직 없었다는 정답이 가정임)
+- "임시 정부가 먼저 있었다면 만세 시위를 누가 준비했을까요?" → friend
+예 2: 숨은 문장 "일제가 쌀 생산을 늘린 덕분에 우리 살림도 넉넉해졌어요", 바른 생각 "늘린 쌀보다 더 많은 쌀을 일본으로 가져가 살림은 어려워졌다"
+- "늘린 쌀이 그대로 우리 밥상에 남았다면 살림은 어땠을까요?" → friend (쌀이 우리에게 남았다는 것은 친구 말에서 나오는 상황)
+- "쌀을 일본으로 가져갔다면 우리 살림은 어땠을까요?" → truth
 출력은 JSON 하나만 냅니다.`;
 
   const fail = (reason) => ({ ok: false, reason });
@@ -258,11 +268,11 @@
         `[핵심 생각] ${p.key}`,
         `[학생이 지금까지 한 말] ${said() || "(없음)"}`,
         `[검사할 질문] ${question}`,
-        "", "가정 부분이 바른 생각·핵심 생각을 미리 알려 주면 reveals를 true로 내세요.",
+        "", "가정이 그리는 상황을 premise에 적고, 그 상황이 누구 쪽인지 side로 내세요.",
       ].join("\n");
       try {
         const out = await llm.call({ system: [{ type: "text", text: PREMISE_SYSTEM }], messages: [{ role: "user", content: [{ type: "text", text }] }], schema: PREMISE_SCHEMA });
-        return !(out && out.reveals === false);
+        return !(out && (out.side === "friend" || out.side === "other"));
       } catch (e) {
         return true;
       }
@@ -439,7 +449,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;
