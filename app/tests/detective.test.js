@@ -186,11 +186,24 @@ test("session: AI question with a synonym of the answer is rejected (휴전 협�
 // ---------- 문제 고르기 ----------
 const pick = (o) => D.pickProblems({ problems: FIXTURE, topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0, ...o });
 
-test("pick: first from today, second from an earlier lesson", () => {
-  const ps = pick();
-  assert.equal(ps.length, 2);
-  assert.ok(["3-2.m06", "3-2.m08"].includes(ps[0].misconception), ps[0].id);
-  assert.equal(ps[1].misconception, "3-2.m02");
+// 2026-11-25 사용자님 결정: 수업 끝 확인이라 두 문제 모두 오늘 차시에서 냅니다(6·25 수업에 임시 정부 문제가 나오지 않게).
+test("pick: both problems come from today when today has two misconceptions", () => {
+  for (let i = 0; i < 6; i++) {
+    const ps = pick({ random: () => i / 6 });
+    assert.equal(ps.length, 2);
+    assert.ok(ps.every((p) => ["3-2.m06", "3-2.m08"].includes(p.misconception)), ids(ps).join(","));
+    assert.notEqual(ps[0].misconception, ps[1].misconception);
+  }
+});
+test("pick: second falls back to an earlier lesson only when today has one misconception", () => {
+  const ps = pick({ lessonId: "3-11" });
+  assert.deepEqual(miscOf(ps), ["3-2.m02", "3-1.m01"]);
+});
+test("fromEarlierLesson tells a review problem from today's", () => {
+  const byId = (id) => FIXTURE.find((p) => p.id === id);
+  assert.equal(D.fromEarlierLesson(byId("3-1.m01.a"), UNIT, "chunjae", "3-11"), true);
+  assert.equal(D.fromEarlierLesson(byId("3-2.m02.a"), UNIT, "chunjae", "3-11"), false);
+  assert.equal(D.fromEarlierLesson(byId("3-1.m01.a"), UNIT, "chunjae", null), false); // 단원 마무리는 복습 표시 없음
 });
 test("pick: unit's first lesson with one misconception gives one problem", () => {
   const ps = pick({ lessonId: "3-2" });
@@ -240,6 +253,32 @@ test("pick: second problem avoids one whose sentences show the first problem's a
   const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
   p06.leakWords = ["피란민"];
   p08.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요.";
+  const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: null, served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
+});
+test("pick: second stays in today even when every other today problem shows an answer word", () => {
+  // 2026-11-25 사용자님 결정 '둘 다 오늘 차시로': 낱말이 겹쳐도 앞 차시(복습)로 넘어가지 않습니다.
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
+  p06.leakWords = ["피란민"];
+  p08.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요.";
+  const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m08.a"]);
+});
+test("pick: first is one whose cards don't show a today partner's answer word", () => {
+  // ③④ 대신 ①②가 먼저 나오면, 둘째 문제를 풀기 전에 첫 문제 카드에서 답을 보지 않습니다.
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a");
+  p08.leakWords = ["피란민"];
+  p06.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요.";
+  const ps = D.pickProblems({ problems: [p06, p08], topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m08.a", "3-2.m06.a"]);
+});
+test("pick: second prefers an overlap seen only on the result screen over one seen before solving", () => {
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
+  p08.leakWords = ["피란민"]; p06.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요."; // 첫 문제 카드에 p08 답 → 풀기 전에 보임
+  p06.leakWords = ["휴전선"]; p02.sentences[0] = "휴전선이 그어졌어요."; // p02 카드에 첫 문제 답 → 결과 화면에서만 보임
   const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: null, served: new Set(), random: () => 0 });
   assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
 });

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>화면 확인 (가짜 AI)</title>
-  <link rel="stylesheet" href="../core/style.css?v=4">
+  <link rel="stylesheet" href="../core/style.css?v=5">
   <style>
     #harness { margin: 24px; padding: 16px; border: 3px dashed #999; font: 16px/1.5 monospace; background: #fff; color: #222; }
     #harness pre { white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; }
@@ -82,8 +82,8 @@
   <script src="../methods/elenchus-views.js?v=4"></script>
   <script src="../methods/friend.js?v=9"></script>
   <script src="../methods/friend-views.js?v=8"></script>
-  <script src="../methods/detective.js?v=12"></script>
-  <script src="../methods/detective-views.js?v=3"></script>
+  <script src="../methods/detective.js?v=14"></script>
+  <script src="../methods/detective-views.js?v=4"></script>
   <script src="../core/app.js?v=3"></script>
   <script src="fixtures/elenchus-views-baseline.js?v=2" onerror="this.remove()"></script>
   <script>
@@ -211,8 +211,9 @@
         queue({ result: "found" }); await answer("군인이요"); await until(() => btn("다음 문제"), "넘어가기"); snap("between-found");
         if (!btn("바로 정리하기")) throw new Error("다음 문제 화면에 [바로 정리하기]가 없음");
         click("다음 문제"); await until(() => q(".dt-card") && !q(".dt-line"), "문제 2");
-        await card(0); reason("날짜가 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤");
-        await card(2); queue({ result: "solved", question: "" }); reason("북한군이 먼저 쳐들어왔어요"); await until(() => btn("결과 보기"), "넘어가기"); snap("between-solved");
+        // 둘째 문제도 오늘 차시(3-12)의 다른 오개념 3-2.m08.a 입니다(숨은 문장 ①).
+        await card(1); reason("시설이 부서진 건 이상해요"); await until(() => q(".dt-line"), "맞는 문장 뒤");
+        await card(0); queue({ result: "solved", question: "" }); reason("휴전선 때문에 오가지 못해서 못 만났어요"); await until(() => btn("결과 보기"), "넘어가기"); snap("between-solved");
         click("결과 보기"); await until(done, "결과"); snap("result");
         await home();
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
@@ -222,8 +223,17 @@
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
         await card(1); queue(new Error("연결 실패")); reason("보통 사람도 다쳤어요"); await until(() => q(".error-box"), "오류"); snap("error");
         click("바로 정리하기"); await until(done, "오류 뒤 결과"); snap("error-finish");
+        // 오늘 차시(3-11)에 오개념이 하나뿐이면 둘째 문제는 앞 차시에서 나오고 '앞에서 배운 내용 복습'이 붙습니다.
+        await home(); await pick("#method", "detective"); await pick("#lesson", "3-11");
+        await go(); click("시작"); await until(() => q(".dt-card"), "문제");
+        if (q(".dt-review")) throw new Error("오늘 차시 첫 문제에 복습 표시가 붙음");
+        const first = window.SOK_DETECTIVE_FIXTURE.find((p) => p.id === "3-2.m02.a");
+        await card(first.hidden); queue({ result: "solved", question: "" }); reason("이상해요"); await until(() => btn("다음 문제"), "넘어가기");
+        click("다음 문제"); await until(() => q(".dt-review"), "복습 표시"); snap("review");
+        click("바로 정리하기"); await until(done, "복습 결과");
+        if (!/문제 2 · 앞에서 배운 내용 복습/.test($("screen").textContent)) throw new Error("결과에 복습 표시가 없음");
         // 이어 묻는 중 [바로 정리하기]: AI가 마지막 판단을 한 뒤 결과로 갑니다.
-        await home();
+        await home(); await pick("#lesson", "3-12");
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
         await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문");
         queue({ result: "solved" }); click("바로 정리하기"); await until(done, "이어 묻는 중 정리"); snap("follow-finish");

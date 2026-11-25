@@ -261,6 +261,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .dt-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .dt-head h2 { margin: 0; }
 .dt-head .bubble-row { flex: 1; min-width: 0; }
+.dt-review { display: inline-block; margin-bottom: 4px; padding: 2px 14px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 22px; font-weight: 800; }
 .dt-lead { margin: 0; font-size: 28px; font-weight: 700; color: var(--ink); }
 .dt-cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .dt-card {

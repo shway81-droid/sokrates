@@ -156,7 +156,7 @@
   }
 
   // ---------- 문제 고르기 ----------
-  // 첫 문제는 오늘 차시, 둘째는 이미 배운 앞 차시(없으면 오늘 차시의 다른 오개념). 단원 마무리는 범위 전체에서 둘.
+  // 두 문제 모두 오늘 차시(서로 다른 오개념). 오늘 차시에 하나뿐이면 둘째는 이미 배운 앞 차시. 단원 마무리는 범위 전체에서 둘.
   // served(이미 낸 문제 id)로 같은 차시 학생들에게 같은 문제가 되풀이되지 않게 돌립니다.
   function pickProblems({ problems, topic, textbookId, lessonId = null, served = new Set(), random = Math.random }) {
     const inScope = new Set(T.scopeFor(topic, textbookId, lessonId).misconceptions.map((m) => m.id));
@@ -172,16 +172,20 @@
     // - 이 문제 문장에 앞 문제의 정답 낱말이 있음(앞 문제를 못 찾고 끝나면 결과 화면에서 답이 보임)
     const flat = (t) => String(t).replace(/\s+/g, "");
     const shows = (sentences, words) => { const seen = flat((sentences || []).join(" ")); return (words || []).some((w) => seen.includes(flat(w))); };
-    // strict면 깨끗한 문제가 없을 때 null을 내어, 다른 무리에서 깨끗한 문제를 먼저 찾게 합니다.
-    function choose(group, avoidMisc, prev = null, strict = false) {
+    // 겹침 정도: 0 안 겹침, 1 이 문제 카드에만 앞 문제 답(결과 화면에서만 보임), 2 앞 문제 카드에 이 문제 답(풀기 전에 보임).
+    const overlap = (prev, p) => (shows(prev.sentences, p.leakWords) ? 2 : shows(p.sentences, prev.leakWords) ? 1 : 0);
+    // 무리 안에서 '풀기 전에 답이 보이는'(2) 문제는 다른 문제가 있으면 피합니다. 남은 문제는 돌림 차례를 먼저 보고,
+    // 차례가 같으면 덜 겹치는(0 → 1) 문제를 고릅니다. 1을 아예 빼면 차시 낱말을 두루 쓰는 문제(예: 3-10 소련·미군)가
+    // 한 번도 안 나와서, 차례가 돌아오면 1도 냅니다. 고를 문제가 없으면 null.
+    function choose(group, avoidMisc, prev = null) {
       const all = group.filter((p) => p.misconception !== avoidMisc);
-      const clean = prev ? all.filter((p) => !shows(prev.sentences, p.leakWords) && !shows(p.sentences, prev.leakWords)) : all;
-      if (strict && !clean.length) return null;
-      const pool = clean.length ? clean : all;
-      if (!pool.length) return null;
+      if (!all.length) return null;
+      const safe = prev ? all.filter((p) => overlap(prev, p) < 2) : all;
+      const pool = safe.length ? safe : all;
       if (pool.every((p) => served.has(p.id))) pool.forEach((p) => served.delete(p.id));
       const servedMisc = new Set(problems.filter((p) => served.has(p.id)).map((p) => p.misconception));
-      const rank = (p) => (served.has(p.id) ? 2 : servedMisc.has(p.misconception) ? 1 : 0);
+      const turn = (p) => (served.has(p.id) ? 2 : servedMisc.has(p.misconception) ? 1 : 0);
+      const rank = (p) => turn(p) * 3 + (prev ? overlap(prev, p) : 0);
       const best = Math.min(...pool.map(rank));
       const top = pool.filter((p) => rank(p) === best);
       const chosen = top[Math.min(top.length - 1, Math.floor(random() * top.length))];
@@ -189,17 +193,25 @@
       return chosen;
     }
 
-    const first = lessonId == null ? choose(cands, null) : choose(today, null) || choose(earlier, null);
+    // 첫 문제는, 같은 무리에 '풀기 전에 답이 보이지 않는' 짝이 있는 문제를 먼저 고릅니다.
+    const pairable = (g) => { const ok = g.filter((a) => g.some((b) => b.misconception !== a.misconception && overlap(a, b) < 2)); return ok.length ? ok : g; };
+    const first = lessonId == null ? choose(pairable(cands), null) : choose(pairable(today), null) || choose(earlier, null);
     if (!first) return [];
-    const rest = lessonId == null ? cands : earlier;
-    // 둘째는 앞 차시에서 고르되, 서로 답을 보여 주지 않는 문제가 앞 차시에 없으면 오늘 차시의 깨끗한 문제를 먼저 봅니다.
-    const groups = lessonId == null ? [rest] : [rest, today];
+    // 둘째도 오늘 차시의 다른 오개념에서 고릅니다(2026-11-25 사용자님 결정: 수업 끝 확인이라 오늘 내용만).
+    // 오늘 차시에 다른 오개념이 없을 때만 앞 차시에서 고르고, 화면에 '복습'이라고 표시합니다(fromEarlierLesson).
+    // 같은 무리 안에서는 정답 낱말이 덜 겹치는 문제를 먼저 고릅니다(겹쳐도 오늘 차시가 앞 차시보다 먼저).
+    const groups = lessonId == null ? [cands] : [today, earlier];
     let second = null;
-    for (const strict of [true, false]) {
-      for (const g of groups) { second = choose(g, first.misconception, first, strict); if (second) break; }
-      if (second) break;
-    }
+    for (const g of groups) { second = choose(g, first.misconception, first); if (second) break; }
     return [first, second].filter(Boolean).slice(0, PROBLEM_COUNT);
+  }
+
+  // 오늘 차시가 아닌 앞 차시 문제인지(복습 표시용). 단원 마무리(lessonId 없음)는 모두 범위 안이라 false입니다.
+  function fromEarlierLesson(problem, topic, textbookId, lessonId) {
+    if (lessonId == null || !problem) return false;
+    const m = topic.misconceptions.find((x) => x.id === problem.misconception);
+    const src = m && m.sources[textbookId];
+    return !!src && src.lesson !== lessonId;
   }
 
   const SYSTEM_PROMPT = `당신은 초등학교 5학년 사회 수업이 끝날 때 "오답 탐정" 활동을 돕는 선생님입니다.
@@ -496,7 +508,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, isDontKnow, isLeading, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, isDontKnow, isLeading, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, fromEarlierLesson, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;

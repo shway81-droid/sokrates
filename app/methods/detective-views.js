@@ -28,6 +28,8 @@
   const drafts = new WeakMap();
   const draftOf = (s, index) => { const d = drafts.get(s); return d && d.index === index ? d.text : ""; };
 
+  const isReview = (kit, p) => D.fromEarlierLesson(p, kit.scope.topic, kit.scope.textbookId, kit.scope.choice.lessonId);
+
   const finishBtn = (kit) => el("button", { class: "btn quiet", type: "button", text: "바로 정리하기", onclick: () => kit.act(kit.session.finishNow()) });
 
   const views = {
@@ -52,10 +54,15 @@
       const r = st.records[st.index];
       const dots = () => P.dots(st.index + 1, st.problems.length);
       const canPick = st.phase === "asking" && st.step === "pick";
+      // 오늘 차시에 오개념이 하나뿐이라 둘째 문제가 앞 차시에서 나왔으면 '복습'이라고 알려 줍니다.
+      const review = isReview(kit, p);
       const parts = [
         P.goal(kit.scope.lessonTitle),
         el("div", { class: "dt-head" }, [
-          el("div", { class: "bubble-row ai" }, [P.avatar(WHO), el("div", { class: "bubble past" }, [el("p", { class: "dt-lead", text: "친구가 배운 것을 이렇게 정리했어요. 한 곳이 이상해요." })])]),
+          el("div", { class: "bubble-row ai" }, [P.avatar(WHO), el("div", { class: "bubble past" }, [
+            review ? el("span", { class: "dt-review", text: "앞에서 배운 내용 복습" }) : null,
+            el("p", { class: "dt-lead", text: "친구가 배운 것을 이렇게 정리했어요. 한 곳이 이상해요." }),
+          ])]),
           dots(),
         ]),
         cards(p, st.step === "pick" ? { ...r, reason: null } : r, { selected: st.selected, onPick: canPick ? (i) => kit.act(s.select(i)) : null }),
@@ -120,7 +127,7 @@
         ...st.records.map((r, i) => {
           const p = st.problems[i];
           return el("div", { class: "card dt-result" }, [
-            el("div", { class: "dt-head" }, [el("h2", { text: `문제 ${i + 1}` }), r.mark ? el("span", { class: `mark dt-${r.mark}`, text: D.MARK_TEXT[r.mark] }) : null]),
+            el("div", { class: "dt-head" }, [el("h2", { text: `문제 ${i + 1}${isReview(kit, p) ? " · 앞에서 배운 내용 복습" : ""}` }), r.mark ? el("span", { class: `mark dt-${r.mark}`, text: D.MARK_TEXT[r.mark] }) : null]),
             cards(p, r),
             r.reason ? el("p", { class: "dt-reason" }, [el("span", { class: "k", text: "나의 까닭" }), el("span", { text: r.reason })]) : null,
           ]);
