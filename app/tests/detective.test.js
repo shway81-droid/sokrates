@@ -34,7 +34,7 @@ test("schemaFor narrows result per stage", () => {
 });
 
 test("validate: good judge, good final", () => {
-  good({ result: "ask", question: "그 사람은 어디에서 무엇을 했을까요?" }, expectJ());
+  good({ result: "ask", question: "그 문장의 어느 부분이 실제와 다를까요?" }, expectJ());
   good({ result: "solved", question: "" }, expectJ());
   good({ result: "found" }, expectJ({ stage: "final" }));
   good({ result: "ask", question: "왜 그렇게 생각했나요?" }, expectJ({ stage: "question" }));
@@ -64,6 +64,75 @@ test("leak check allows words the student said", () => {
   assert.equal(D.leakIn("도쿄에서는 무슨 일이 있었을까요?", ["도쿄", "윤봉길"], "도 쿄에서 던졌어요"), null);
   assert.equal(D.leakIn("왜 그렇게 생각했나요?", ["도쿄"], ""), null);
   good({ result: "ask", question: "도쿄에서는 무슨 일이 있었을까요?" }, expectJ({ said: "도 쿄에서 던졌어요" }));
+});
+
+// 실제 점검(2026-11-25)에서 하이쿠가 낸 사실 묻기 질문과, 통과해야 하는 질문
+const FACT_QS = [
+  "그럼 5·10 총선거로는 무엇을 뽑았을까요?",
+  "그럼 6·25 전쟁은 언제, 누구의 침략으로 시작되었을까요?",
+  "3·1 운동이 처음 일어난 날은 언제였을까요?",
+  "그럼 신채호는 어떤 일을 한 사람이었을까요?",
+  "그럼 이봉창은 어떤 일을 했을까요?",
+  "국제 연합은 어떤 모임일까요?",
+  "그 사람은 누구였을까요?",
+  "6월 25일에 38도선을 넘어 온 군대는 어느 나라 군대였을까요?",
+];
+const OPEN_QS = [
+  "그럼 늘어난 쌀은 실제로 누구의 밥상에 올라갔을까요?",
+  "그 문장에서 어느 낱말이 가장 이상해 보였나요?",
+  "국제 연합이 미국 군대만 보냈다면 다른 나라들은 무엇을 했을까요?",
+  "그 부분이 실제로는 어땠는지 말해 줄래요?",
+  "왜 그렇게 생각했는지 더 말해 줄래요?",
+  "그럼 그 문장의 어느 부분이 실제와 다를까요?",
+  "그 문장에서 어느 부분이 실제 선거 내용과 다른 것 같나요?",
+  "헌병이 늘 지켜보는 곳에서 마음 놓고 모일 수 있었을까요?",
+];
+test("fact check: questions that make the student recall one fact are caught", () => {
+  for (const q of FACT_QS) assert.equal(D.isFactQuestion(q), true, q);
+  for (const q of OPEN_QS) assert.equal(D.isFactQuestion(q), false, q);
+});
+test("validate: fact-recall question is rejected with a reason", () =>
+  bad({ result: "ask", question: "그럼 5·10 총선거로는 무엇을 뽑았을까요?" }, expectJ({ leakWords: [] }), /사실/));
+test("prompt examples do not teach the fact-recall form", () => {
+  const good = D.SYSTEM_PROMPT.split("\n").filter((l) => /→ ask, question/.test(l));
+  assert.ok(good.length > 0);
+  for (const l of good) assert.equal(D.isFactQuestion(l.match(/question "([^"]+)"/)[1]), false, l);
+});
+
+test("leak check: a synonym group is blocked until the student says any member", () => {
+  const groups = [["정전", "정전 협정", "휴전 협정"]];
+  assert.equal(D.leakIn("휴전 협정을 맺은 뒤 전쟁은 어떻게 되었을까요?", groups, "끝난 게 아니에요"), "휴전 협정");
+  assert.equal(D.leakIn("휴전 협정을 맺은 뒤 전쟁은 어떻게 되었을까요?", groups, "정전이에요"), null);
+});
+test("leakWordsFor adds topic synonyms of each answer word, minus words already on the cards", () => {
+  const topic = { synonyms: [["정전 협정", "휴전 협정"], ["휴전선", "군사 분계선"], ["광복", "해방"]] };
+  const p = { leakWords: ["정전", "멈춘"], sentences: ["휴전선 근처에서 싸웠어요.", "가", "나", "다"] };
+  const w = D.leakWordsFor(p, topic);
+  assert.deepEqual(w[0], ["정전", "정전 협정", "휴전 협정"]);
+  assert.equal(w[1], "멈춘");
+  const p2 = { leakWords: ["정전"], sentences: ["정전 협정이 맺어졌어요.", "가", "나", "다"] };
+  assert.deepEqual(D.leakWordsFor(p2, topic)[0], ["정전", "휴전 협정"]);
+});
+test("leakWordsFor does not pull in a group just because a word is hidden inside a longer one", () => {
+  const topic = { synonyms: [["국군", "한국군", "남한 군대"], ["중국군", "중공군"], ["광주 학생 항일 운동", "광주 학생 독립운동"], ["북한군", "북한 군대"]] };
+  const p = { leakWords: ["중국군", "독립운동", "군대"], sentences: ["가", "나", "다", "라"] };
+  assert.deepEqual(D.leakWordsFor(p, topic), [["중국군", "중공군"], "독립운동", "군대"]);
+});
+test("session: AI question with a synonym of the answer is rejected (휴전 협정 for 정전)", async () => {
+  const p = JSON.parse(JSON.stringify(FIXTURE.find((x) => x.id === "3-2.m06.a")));
+  p.leakWords = ["정전"];
+  const seen = [];
+  const llm = { async call(req) {
+    seen.push(req);
+    return seen.length === 1 ? { result: "ask", question: "휴전 협정을 맺은 뒤 전쟁은 어떻게 되었을까요?" } : { result: "ask", question: "그 문장의 어느 부분이 실제와 다를까요?" };
+  } };
+  const s = D.createSession({ topic: UNIT, textbookId: "chunjae", lessonId: "3-12", llm, problems: [p], problemIds: [p.id] });
+  await s.start();
+  await s.select(p.hidden);
+  const st = await s.submitReason("끝난 게 아니에요");
+  assert.equal(seen.length, 2);
+  assert.match(JSON.stringify(seen[1].messages), /휴전 협정/);
+  assert.equal(st.question, "그 문장의 어느 부분이 실제와 다를까요?");
 });
 
 // ---------- 문제 고르기 ----------

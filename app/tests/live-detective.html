@@ -49,8 +49,8 @@
 <script src="../data/units.js"></script>
 <script src="../data/topic-3-1.js"></script>
 <script src="../data/topic-3-2.js"></script>
-<script src="../data/detective-3-1.js?v=1"></script>
-<script src="../data/detective-3-2.js?v=1"></script>
+<script src="../data/detective-3-1.js?v=2"></script>
+<script src="../data/detective-3-2.js?v=2"></script>
 <!-- 교과서 원문: 선생님 PC에만 있는 파일(tools/build_local_texts.py로 만듦). 없으면 요약 개념만으로 판단합니다. -->
 <script src="../local/texts.js" onerror="this.remove()"></script>
 <script src="../core/guard.js"></script>
@@ -58,7 +58,7 @@
 <script src="../core/catalog.js"></script>
 <script src="../core/llm.js"></script>
 <script src="../core/ui.js?v=3"></script>
-<script src="../methods/detective.js?v=1"></script>
+<script src="../methods/detective.js?v=3"></script>
 <script src="live-cases.js"></script>
 <script src="live-detective-cases.js?v=1"></script>
 <script>
@@ -114,9 +114,9 @@
     let said = r.reason || "";
     const leaks = [];
     for (const t of turns) { const lw = D.leakIn(t.q, p.leakWords, said); if (lw) leaks.push(lw); said += " " + t.a; }
-    const quiz = turns.filter((t) => QUIZ.test(t.q) || D.isChoice(t.q)).length;
+    const quiz = turns.filter((t) => QUIZ.test(t.q) || D.isChoice(t.q) || D.isFactQuestion(t.q)).length;
     const ok = st.phase !== "error" && c.expect.mark.includes(r.mark);
-    // 검사에 걸려 기본값으로 대신했거나, 퀴즈·고르기 질문을 냈거나, 정답 낱말을 먼저 말했으면 "다름"으로 셉니다.
+    // 검사에 걸려 기본값으로 대신했거나, 퀴즈·고르기·사실 묻기 질문을 냈거나, 정답 낱말을 먼저 말했으면 "다름"으로 셉니다.
     const same = ok && st.fallbacks === 0 && quiz === 0 && leaks.length === 0;
     return { c, st, p, r, turns, lines, endLine, leaks, calls, ms, same, ok, quiz, cause };
   }
@@ -132,7 +132,7 @@
     ...r.r.wrongTaps.map((x) => `${NUM[x.index]} ${r.p.sentences[x.index]} → ${x.reason}`),
     ...(r.r.reason != null ? [`${NUM[r.p.hidden]}(숨은) → ${r.r.reason}`] : []),
   ];
-  const badQ = (q) => QUIZ.test(q) || D.isChoice(q) || G.charLen(q) > G.MAX_CHARS;
+  const badQ = (q) => QUIZ.test(q) || D.isChoice(q) || D.isFactQuestion(q) || G.charLen(q) > G.MAX_CHARS;
   const markText = (r) => r.st.phase === "error" ? `오류: ${r.cause || r.st.error}` : (r.r.mark || "-");
 
   function render(n, r) {
@@ -175,7 +175,7 @@
       const rs = results.filter((r) => r.c.group === g);
       return `${g} ${rs.filter((r) => r.same).length}/${rs.length}`;
     }).join(" · ");
-    return `일치 ${same}/${results.length} (${groups}) · 퀴즈·고르기 질문 ${quiz}개 · 정답 낱말 먼저 ${leak}번 · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번 · 오류 ${err}건`;
+    return `일치 ${same}/${results.length} (${groups}) · 퀴즈·고르기·사실 묻기 질문 ${quiz}개 · 정답 낱말 먼저 ${leak}번 · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번 · 오류 ${err}건`;
   }
 
   async function runAll(list) {

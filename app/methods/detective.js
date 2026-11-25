@@ -47,15 +47,45 @@
 
   // 정답 낱말: 바른 생각에만 있는 낱말이 질문에 먼저 나오면 정답을 알려 주는 셈입니다.
   // 학생이 이미 말한 낱말은 되받아도 됩니다(띄어쓰기 무시).
+  // 낱말 자리에 같은 뜻 무리(배열)가 올 수 있습니다. 학생이 무리 가운데 하나라도 말했으면 그 무리 전체를 되받아도 됩니다.
   function leakIn(question, leakWords, said) {
     const q = squash(question);
     const s = squash(said);
-    return (leakWords || []).find((w) => squash(w) && q.includes(squash(w)) && !s.includes(squash(w))) || null;
+    for (const entry of leakWords || []) {
+      const words = (Array.isArray(entry) ? entry : [entry]).filter((w) => squash(w));
+      if (words.some((w) => s.includes(squash(w)))) continue;
+      const hit = words.find((w) => q.includes(squash(w)));
+      if (hit) return hit;
+    }
+    return null;
   }
+
+  // 문제의 정답 낱말에 단원의 같은 뜻 낱말(synonyms)을 더합니다(정전 → 정전 협정, 휴전 협정).
+  // 카드 4문장에 이미 보이는 낱말은 더하지 않습니다(학생 눈앞에 있는 말이라 새는 것이 아님).
+  function leakWordsFor(problem, topic) {
+    const groups = (topic && topic.synonyms) || [];
+    const onCards = squash((problem.sentences || []).join(" "));
+    return (problem.leakWords || []).map((w) => {
+      const sw = squash(w);
+      const extra = groups
+        // 같은 낱말이거나, 그 낱말로 시작하는 말("정전" → "정전 협정")일 때만 그 무리를 씁니다("중국군"이 "국군"을 끌어오지 않게).
+        .filter((g) => g.some((m) => squash(m) === sw || String(m).trim().startsWith(String(w).trim() + " ")))
+        .flat()
+        .filter((m) => squash(m) !== sw && !onCards.includes(squash(m)));
+      const uniq = [...new Set(extra)];
+      return uniq.length ? [w, ...uniq] : w;
+    });
+  }
+
+  // 사실 하나를 떠올려 맞히게 하는 질문(언제·누가·무엇을·어디에서·어떤 일을 한…)은 퀴즈입니다.
+  // "~다면/~려면"처럼 학생 주장이 맞을 때의 결과를 묻는 가정과, 까닭·목적("누구를 위해서")을 묻는 질문은 괜찮습니다.
+  const FACT = /언제|누구(가|를|였|일까|인가)|무엇(을|이었|일까|인가)|어디(에서|서|였|일까|로)(?!든)|어떤\s*일을\s*(한|했)|어떤\s*\S+(일까요|인가요)\s*[?？]\s*$|어느\s+\S+(\s+\S+)?(였을까요|이었을까요|일까요|인가요)\s*[?？]\s*$|어느\s*나라|몇\s*\S*(년|명|개|나라|번)/;
+  const NOT_FACT = /다면|라면|려면|었으면|였으면|했으면|까닭|이유|왜|위해/;
+  const isFactQuestion = (q) => FACT.test(String(q ?? "")) && !NOT_FACT.test(String(q ?? ""));
 
   const fail = (reason) => ({ ok: false, reason });
 
-  // expect = { stage: "judge"|"final"|"question", asked: string[], leakWords: string[], said: string }
+  // expect = { stage: "judge"|"final"|"question", asked: string[], leakWords: (string|string[])[], said: string }
   function validateDetectiveStep(out, expect) {
     if (!out || typeof out !== "object") return fail("객체가 아님");
     const allowed = RESULTS[expect.stage];
@@ -64,6 +94,8 @@
     const q = G.checkQuestion(out.question);
     if (!q.ok) return fail(q.reason);
     if (isChoice(out.question)) return fail("둘 중 하나를 고르게 하는 질문임 — 질문 하나로만 물을 것");
+    if (isFactQuestion(out.question))
+      return fail("사실 하나(언제·누가·무엇을·어디·어떤 일)를 맞히게 하는 퀴즈 질문임 — 학생 말이 맞다면 어떤 일이 생기는지, 또는 왜 그렇게 생각했는지 물을 것");
     if ((expect.asked || []).some((a) => squash(a) === squash(out.question)))
       return fail("앞에서 한 질문과 같음 — 학생의 마지막 답에 맞춰 다른 질문을 낼 것");
     const w = leakIn(out.question, expect.leakWords, expect.said);
@@ -122,12 +154,12 @@
 3. 학생 말을 따라가 스스로 생각하게 합니다. 아니라고만 했으면 "그럼 실제로는 어땠을까요?" 쪽으로, 까닭이 빠졌으면 "왜 그렇게 되었을까요?" 쪽으로 묻습니다. 학생이 이미 꺼낸 말("다른 데서 던졌어요")을 더 말해 보게 하는 것은 좋습니다.
 4. 학생이 "몰라요"라고 하면 같은 것을 다시 묻지 않고, 그 사실을 몰라도 답할 수 있는 더 쉬운 질문으로 바꿉니다. [이어 묻는 질문의 예]를 참고합니다.
 5. 학생이 되물으면 답을 알려 주지 않고 질문을 이어 갑니다.
-6. 퀴즈를 내지 않습니다. 이름, 연도, 장소, 숫자를 맞히게 하는 질문("~의 이름은 무엇일까요?", "몇 년이었을까요?")은 쓰지 않습니다. "~일까요, ~일까요?"처럼 둘 중 하나를 고르게 하는 질문도 쓰지 않습니다.
+6. 퀴즈를 내지 않습니다. 이름, 연도, 장소, 숫자를 맞히게 하는 질문("~의 이름은 무엇일까요?", "몇 년이었을까요?")과, 사실 하나를 떠올리게 하는 질문("언제였을까요?", "무엇을 뽑았을까요?", "어떤 일을 한 사람이었을까요?")은 쓰지 않습니다. 대신 학생 말이 맞다면 어떤 일이 생기는지 묻습니다(쌀 문제의 예: "늘어난 쌀은 누구의 밥상에 올라갔을까요?"). "~일까요, ~일까요?"처럼 둘 중 하나를 고르게 하는 질문도 쓰지 않습니다.
 7. 5학년이 아는 쉬운 낱말을 씁니다. "정답은", "오답" 같은 말과 학생이 잘못했다는 느낌을 주는 말은 쓰지 않습니다.
 8. 출력은 주어진 JSON 형식 하나만 냅니다. solved면 question은 ""입니다.
 
 예시(이봉창 문제, 숨은 문장 "이봉창은 상하이 훙커우 공원에서 폭탄을 던졌어요.", 핵심 생각 "이봉창은 도쿄에서 일본 왕을 향해 폭탄을 던졌다"):
-- 학생 까닭 "이봉창이 아니에요" → ask, question "그럼 이봉창은 어떤 일을 했을까요?"
+- 학생 까닭 "이봉창이 아니에요" → ask, question "그 문장의 어느 부분이 실제와 다를까요?" ("이봉창은 어떤 일을 했을까요?"는 사실을 맞히게 하는 퀴즈라 안 됨)
 - 학생 답 "몰라요" → ask. "이봉창은 누구를 향해 폭탄을 던졌을까요?"는 퀴즈라 안 됨. "그 문장에서 어느 낱말이 가장 이상해 보였나요?"처럼 몰라도 답할 수 있는 쉬운 질문
 - 학생 답 "이봉창은 일본에 가서 일본 왕한테 던졌어요" → solved`;
 
@@ -185,7 +217,7 @@
       const lines = [`[문제] 친구의 정리`, ...p.sentences.map((s, i) => `${i + 1}. ${s}`), `숨은 문장: ${p.hidden + 1}번`];
       if (m) lines.push(`틀린 생각(오개념 ${m.id}): ${m.wrong}`, `바른 생각: ${m.truth}`);
       lines.push(`핵심 생각(판단 기준): ${p.key}`, `이어 묻는 질문의 예: ${p.hints.join(" / ")}`,
-        `[정답 낱말] 학생이 먼저 말하기 전에는 질문에 쓰지 말 것: ${p.leakWords.join(", ")}`,
+        `[정답 낱말] 학생이 먼저 말하기 전에는 질문에 쓰지 말 것: ${leakWordsFor(p, topic).flat().join(", ")}`,
         "", "[학생의 까닭]", r.reason);
       if (r.turns.length) {
         lines.push("", "[이어 묻는 질문과 답]");
@@ -210,7 +242,7 @@
       for (let attempt = 1; attempt <= tries; attempt++) {
         const out = await llm.call({ system, messages: [{ role: "user", content: buildMessage(task, note) }], schema: schemaFor(shape) });
         if (gen !== generation) throw CANCELLED; // 기다리는 동안 [다음 학생]을 눌렀으면 결과를 버립니다
-        const v = validateDetectiveStep(out, { stage: shape, asked, leakWords: problem().leakWords, said: said() });
+        const v = validateDetectiveStep(out, { stage: shape, asked, leakWords: leakWordsFor(problem(), topic), said: said() });
         if (v.ok) return out;
         if (stage === "judge" && out && out.result === "ask") shape = "question";
         note = `[앞 응답이 검사에 걸렸어요: ${v.reason}] 이 점만 고쳐 다시 내세요.${shape === "question" ? ' result는 "ask"로 두고 질문만 다시 내세요.' : ""}`;
@@ -365,7 +397,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, leakIn, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;
