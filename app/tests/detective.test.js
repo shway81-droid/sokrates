@@ -191,6 +191,21 @@ test("pick: second problem avoids one whose answer words appear in the first pro
   const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: null, served: new Set(), random: () => 0 });
   assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
 });
+test("pick: second problem avoids one whose sentences show the first problem's answer words", () => {
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
+  p06.leakWords = ["피란민"];
+  p08.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요.";
+  const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: null, served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
+});
+test("pick: a clean problem from today beats an earlier one that shows the answer", () => {
+  const list = JSON.parse(JSON.stringify(FIXTURE));
+  for (const p of list) if (!["3-2.m06", "3-2.m08"].includes(p.misconception)) p.sentences[0] = "전쟁 때 민간인도 많이 다쳤어요.";
+  const ps = D.pickProblems({ problems: list, topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0 });
+  assert.equal(ps[0].id, "3-2.m06.a");
+  assert.equal(ps[1].id, "3-2.m08.a");
+});
 test("pick: textbook outside problem.textbooks is skipped", () => {
   for (let i = 0; i < 5; i++) {
     const ps = pick({ textbookId: "icecream", lessonId: "3-12", random: () => i / 5 });
@@ -325,8 +340,8 @@ test("final keeps failing → found and fallback", async () => {
   assert.equal(st.records[0].mark, "found"); assert.equal(st.fallbacks, 1);
 });
 
-test("finishNow: reason sent → found; only tapped → together; unstarted problems omitted", async () => {
-  const s1 = await started(fakeLLM([ASK("피란 가던 사람들은 안전했을까요?")]));
+test("finishNow: reason sent → AI's last judgment; only tapped → together; unstarted problems omitted", async () => {
+  const s1 = await started(fakeLLM([ASK("피란 가던 사람들은 안전했을까요?"), { result: "found" }]));
   await s1.select(1); await s1.submitReason("아니에요");
   let st = await s1.finishNow();
   assert.equal(st.phase, "done"); assert.equal(st.records.length, 1); assert.equal(st.records[0].mark, "found");
@@ -380,6 +395,24 @@ test("error then retry repeats the judge call", async () => {
   assert.equal(userText(llm.calls[0]), userText(llm.calls[1]));
 });
 
+test("finishNow during a follow question asks the AI for a last judgment", async () => {
+  const llm = fakeLLM([ASK("피란 가던 사람들은 안전했을까요?"), ASK("마을에서 싸움이 나면 누가 다칠까요?"), { result: "solved" }]);
+  const s = await started(llm);
+  await s.select(1); await s.submitReason("아니에요"); await s.submitAnswer("마을 사람들도 다쳤어요");
+  assert.equal(s.getState().step, "follow");
+  const st = await s.finishNow();
+  assert.equal(llm.calls.length, 3);
+  assert.deepEqual(llm.calls[2].schema, D.schemaFor("final"));
+  assert.equal(st.phase, "done"); assert.equal(st.records[0].mark, "solved");
+});
+test("finishNow during a follow question: AI fails → error screen, which can still finish", async () => {
+  const s = await started(fakeLLM([ASK("피란 가던 사람들은 안전했을까요?"), new Error("연결 실패")]));
+  await s.select(1); await s.submitReason("아니에요");
+  let st = await s.finishNow();
+  assert.equal(st.phase, "error");
+  st = await s.finishNow();
+  assert.equal(st.phase, "done"); assert.equal(st.records[0].mark, "found");
+});
 test("finishNow from the error screen keeps what the student did", async () => {
   const s = await started(fakeLLM([SOLVED, new Error("연결 실패")]));
   await s.select(1); await s.submitReason("보통 사람도 다쳤어요"); await s.next();

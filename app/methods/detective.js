@@ -149,11 +149,16 @@
     const earlier = cands.filter((p) => !isToday(p));
 
     // 안 낸 문제(오개념도 안 나옴) → 안 낸 문제(오개념은 나옴) → 낸 문제 차례. 모두 냈으면 그 무리의 기억을 비우고 다시 돕니다.
-    // shown: 앞 문제의 문장들. 그 문장에 정답 낱말이 들어 있는 문제는 (다른 문제가 있으면) 내지 않습니다.
-    function choose(group, avoidMisc, shown = []) {
+    // prev: 앞 문제. 두 문제가 서로의 답을 보여 주지 않게, (다른 문제가 있으면) 이런 문제는 내지 않습니다.
+    // - 앞 문제 문장에 이 문제의 정답 낱말이 있음
+    // - 이 문제 문장에 앞 문제의 정답 낱말이 있음(앞 문제를 못 찾고 끝나면 결과 화면에서 답이 보임)
+    const flat = (t) => String(t).replace(/\s+/g, "");
+    const shows = (sentences, words) => { const seen = flat((sentences || []).join(" ")); return (words || []).some((w) => seen.includes(flat(w))); };
+    // strict면 깨끗한 문제가 없을 때 null을 내어, 다른 무리에서 깨끗한 문제를 먼저 찾게 합니다.
+    function choose(group, avoidMisc, prev = null, strict = false) {
       const all = group.filter((p) => p.misconception !== avoidMisc);
-      const seen = shown.join(" ").replace(/\s+/g, "");
-      const clean = all.filter((p) => !(p.leakWords || []).some((w) => seen.includes(w.replace(/\s+/g, ""))));
+      const clean = prev ? all.filter((p) => !shows(prev.sentences, p.leakWords) && !shows(p.sentences, prev.leakWords)) : all;
+      if (strict && !clean.length) return null;
       const pool = clean.length ? clean : all;
       if (!pool.length) return null;
       if (pool.every((p) => served.has(p.id))) pool.forEach((p) => served.delete(p.id));
@@ -169,7 +174,13 @@
     const first = lessonId == null ? choose(cands, null) : choose(today, null) || choose(earlier, null);
     if (!first) return [];
     const rest = lessonId == null ? cands : earlier;
-    const second = choose(rest, first.misconception, first.sentences) || (lessonId == null ? null : choose(today, first.misconception, first.sentences));
+    // 둘째는 앞 차시에서 고르되, 서로 답을 보여 주지 않는 문제가 앞 차시에 없으면 오늘 차시의 깨끗한 문제를 먼저 봅니다.
+    const groups = lessonId == null ? [rest] : [rest, today];
+    let second = null;
+    for (const strict of [true, false]) {
+      for (const g of groups) { second = choose(g, first.misconception, first, strict); if (second) break; }
+      if (second) break;
+    }
     return [first, second].filter(Boolean).slice(0, PROBLEM_COUNT);
   }
 
@@ -332,6 +343,11 @@
       close(out ? out.result : "found");
     }
 
+    async function finalThenDone() {
+      await doFinal();
+      Object.assign(state, { phase: "done", step: "pick", selected: null, question: null, line: null });
+    }
+
     // action을 실행합니다. 처리 중 표시, 오류 처리, 취소된 세션의 늦은 응답 버리기를 맡습니다.
     async function run(action) {
       lastAction = action;
@@ -339,7 +355,7 @@
       state.error = null;
       try {
         await action();
-        state.phase = "asking";
+        if (state.phase === "waiting") state.phase = "asking"; // action이 끝내기(done)로 정했으면 그대로 둡니다
       } catch (e) {
         if (e === CANCELLED) return snapshot();
         state.phase = "error";
@@ -404,9 +420,11 @@
         return snapshot();
       },
 
-      // [바로 정리하기]: 하던 문제는 까닭을 보냈으면 found, 아니면 together. 시작하지 않은 문제는 결과에 나오지 않습니다.
-      // AI 연결이 끊긴 오류 화면에서도 누를 수 있어, 그때까지 한 기록을 결과로 남깁니다.
+      // [바로 정리하기]: 이어 묻는 중이면 AI가 그때까지의 까닭과 답으로 마지막 판단(solved/found)을 한 뒤 끝냅니다.
+      // 숨은 문장을 아직 못 찾았으면 together. 시작하지 않은 문제는 결과에 나오지 않습니다.
+      // AI 연결이 끊긴 오류 화면에서도 누를 수 있어, 그때까지 한 기록을 결과로 남깁니다(까닭을 보냈으면 found).
       async finishNow() {
+        if (state.phase === "asking" && state.step === "follow") return run(finalThenDone);
         if (state.phase !== "asking" && state.phase !== "error") return snapshot();
         const r = record();
         if (r && !r.mark) r.mark = r.reason != null ? "found" : "together";
