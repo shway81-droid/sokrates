@@ -219,6 +219,23 @@ test("pick: unserved problems first, then unserved misconceptions", () => {
   assert.notEqual(ps[0].id, "3-2.m06.a");
   assert.equal(ps[0].id, "3-2.m08.a"); // 3-2.m06.b 는 안 낸 문제지만 오개념 3-2.m06 이 이미 나왔음
 });
+// 2026-11-25 사용자님 결정(3번): 한 차시에 학생 3명쯤이 TV 앞에서 이어서 합니다. 앞 학생이 푼 오개념은 뒤 학생이 이미 보았으므로,
+// 아직 안 나온 오개념을 먼저 냅니다 — 오늘 차시 → (오늘 것을 다 썼으면) 앞 차시 복습 → (그것도 다 썼으면) 오늘 차시부터 다시.
+test("pick: next student gets unseen earlier misconceptions once today's are all seen", () => {
+  const served = new Set();
+  const s1 = pick({ served });
+  assert.deepEqual(miscOf(s1).sort(), ["3-2.m06", "3-2.m08"]);
+  const s2 = pick({ served });
+  assert.deepEqual(miscOf(s2).sort(), ["3-1.m01", "3-2.m02"]);
+  assert.ok(s2.every((p) => D.fromEarlierLesson(p, UNIT, "chunjae", "3-12")));
+  const s3 = pick({ served });
+  assert.deepEqual(miscOf(s3).sort(), ["3-2.m06", "3-2.m08"]); // 모두 나왔으면 오늘 차시부터 다시
+});
+test("pick: an unseen earlier misconception beats a seen one from today for the second problem", () => {
+  const ps = pick({ served: new Set(["3-2.m06.a"]) });
+  assert.equal(ps[0].id, "3-2.m08.a");
+  assert.ok(["3-2.m02", "3-1.m01"].includes(ps[1].misconception), ids(ps).join(","));
+});
 test("pick: served set records what was picked", () => {
   const served = new Set();
   const ps = pick({ served });
@@ -264,6 +281,15 @@ test("pick: second stays in today even when every other today problem shows an a
   p08.sentences[0] = "피란민이 남쪽으로 많이 내려왔어요.";
   const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0 });
   assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m08.a"]);
+});
+test("pick: when the only unseen today partner would show its answer before solving, an unseen review comes second", () => {
+  // 3-10처럼 두 오개념이 서로의 답 낱말을 카드에 담고 있으면(둘 다 '풀기 전에 보임'), 그 짝 대신 안 나온 앞 차시 오개념을 냅니다.
+  const byId = (id) => JSON.parse(JSON.stringify(FIXTURE.find((p) => p.id === id)));
+  const p06 = byId("3-2.m06.a"), p08 = byId("3-2.m08.a"), p02 = byId("3-2.m02.a");
+  p06.leakWords = ["피란민"]; p08.sentences[1] = "피란민이 남쪽으로 많이 내려왔어요.";
+  p08.leakWords = ["이산가족"]; p06.sentences[0] = "이 전쟁으로 이산가족이 많이 생겼어요.";
+  const ps = D.pickProblems({ problems: [p06, p08, p02], topic: UNIT, textbookId: "chunjae", lessonId: "3-12", served: new Set(), random: () => 0 });
+  assert.deepEqual(ids(ps), ["3-2.m06.a", "3-2.m02.a"]);
 });
 test("pick: first is one whose cards don't show a today partner's answer word", () => {
   // ③④ 대신 ①②가 먼저 나오면, 둘째 문제를 풀기 전에 첫 문제 카드에서 답을 보지 않습니다.

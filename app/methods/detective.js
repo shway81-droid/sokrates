@@ -156,7 +156,7 @@
   }
 
   // ---------- 문제 고르기 ----------
-  // 두 문제 모두 오늘 차시(서로 다른 오개념). 오늘 차시에 하나뿐이면 둘째는 이미 배운 앞 차시. 단원 마무리는 범위 전체에서 둘.
+  // 두 문제는 서로 다른 오개념. 아직 안 나온 오개념을 오늘 차시 → 앞 차시(복습) 차례로 냅니다. 단원 마무리는 범위 전체에서 둘.
   // served(이미 낸 문제 id)로 같은 차시 학생들에게 같은 문제가 되풀이되지 않게 돌립니다.
   function pickProblems({ problems, topic, textbookId, lessonId = null, served = new Set(), random = Math.random }) {
     const inScope = new Set(T.scopeFor(topic, textbookId, lessonId).misconceptions.map((m) => m.id));
@@ -193,16 +193,24 @@
       return chosen;
     }
 
+    // 고르는 무리 차례(2026-11-25 사용자님 결정):
+    // - 수업 끝 확인이라 오늘 차시가 먼저입니다(6·25 수업에 임시 정부 문제가 나오지 않게).
+    // - 한 차시에 학생 3명쯤이 TV 앞에서 이어서 하므로, 앞 학생이 푼 오개념(뒤 학생이 이미 봄)보다
+    //   아직 안 나온 오개념을 먼저 냅니다. 오늘 것을 다 썼으면 앞 차시에서 '복습'으로 냅니다(fromEarlierLesson).
+    // - 안 나온 오개념이 하나도 없으면 오늘 차시부터 다시 돕니다(choose가 그 무리의 기억을 비움).
+    const fresh = (g) => { const seen = new Set(problems.filter((p) => served.has(p.id)).map((p) => p.misconception)); return g.filter((p) => !seen.has(p.misconception)); };
+    const order = () => (lessonId == null ? [fresh(cands), cands] : [fresh(today), fresh(earlier), today, earlier]);
     // 첫 문제는, 같은 무리에 '풀기 전에 답이 보이지 않는' 짝이 있는 문제를 먼저 고릅니다.
     const pairable = (g) => { const ok = g.filter((a) => g.some((b) => b.misconception !== a.misconception && overlap(a, b) < 2)); return ok.length ? ok : g; };
-    const first = lessonId == null ? choose(pairable(cands), null) : choose(pairable(today), null) || choose(earlier, null);
+    let first = null;
+    for (const g of order()) { first = choose(pairable(g), null); if (first) break; }
     if (!first) return [];
-    // 둘째도 오늘 차시의 다른 오개념에서 고릅니다(2026-11-25 사용자님 결정: 수업 끝 확인이라 오늘 내용만).
-    // 오늘 차시에 다른 오개념이 없을 때만 앞 차시에서 고르고, 화면에 '복습'이라고 표시합니다(fromEarlierLesson).
-    // 같은 무리 안에서는 정답 낱말이 덜 겹치는 문제를 먼저 고릅니다(겹쳐도 오늘 차시가 앞 차시보다 먼저).
-    const groups = lessonId == null ? [cands] : [today, earlier];
+    // 둘째 문제는 첫 문제 카드에 답이 보이지 않는(겹침 2가 아닌) 문제를 무리 차례대로 찾습니다. 오늘 안 나온 짝이 그런 문제뿐이면
+    // 안 나온 앞 차시 복습으로 넘어갑니다(3-10 광복·정부 수립 문제처럼 서로 답 낱말을 담은 짝). 어느 무리에도 없을 때만 겹침 2를 냅니다.
+    // 같은 무리 안에서는 정답 낱말이 덜 겹치는 문제를 먼저 고릅니다.
     let second = null;
-    for (const g of groups) { second = choose(g, first.misconception, first); if (second) break; }
+    for (const g of order()) { second = choose(g.filter((p) => overlap(first, p) < 2), first.misconception, first); if (second) break; }
+    if (!second) for (const g of order()) { second = choose(g, first.misconception, first); if (second) break; }
     return [first, second].filter(Boolean).slice(0, PROBLEM_COUNT);
   }
 
