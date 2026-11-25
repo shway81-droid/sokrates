@@ -20,7 +20,7 @@ test("detective data files exist for 3-1 and 3-2", () => {
 });
 
 test("each misconception has exactly 2 problems", () => {
-  assert.equal(problems.length, 56);
+  assert.equal(problems.length, miscById.size * 2); // 2026-11-25 오개념 32개 × 2 = 64
   assert.equal(new Set(problems.map((p) => p.id)).size, problems.length, "id 겹침");
   for (const m of miscById.keys()) {
     const mine = problems.filter((p) => p.misconception === m);
