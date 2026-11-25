@@ -1,0 +1,39 @@
+# main 에 올라올 때마다 수업 화면만 GitHub Pages 로 배포합니다.
+# 교사용 점검 화면(app/tests, app/review.html)과 교과서 본문(app/local)은 올리지 않습니다.
+name: Pages 배포
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 수업 화면만 모으기
+        run: |
+          mkdir _site
+          cp app/index.html _site/
+          cp -r app/core app/data app/methods _site/
+          touch _site/.nojekyll
+          find _site -type f | sort
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v4
