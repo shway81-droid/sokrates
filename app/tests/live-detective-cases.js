@@ -41,7 +41,7 @@
 
     // 숨은 문장 안에서 다른 부분을 이상하다고 보는 학생
     { name: "천재 3-11 · 날짜가 이상하다고 함", ...at("chunjae", "3-11", "다른 곳을 봄"), problem: "3-2.m02.a",
-      taps: ["hidden"], wrongReasons: [], reason: "날짜가 이상해요", answers: ["모르겠어요", "북한군이 먼저 쳐들어왔어요"],
+      taps: ["hidden"], wrongReasons: [], reason: "날짜가 이상해요", answers: ["6월 25일이 아닌 것 같아요", "북한군이 먼저 쳐들어왔어요"],
       expect: { mark: ["solved"] } },
 
     // 되묻는 학생

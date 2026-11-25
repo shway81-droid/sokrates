@@ -91,6 +91,11 @@
   };
 
   // 가정 질문("~다면/~라면/~려면")은 사실 묻기 검사를 비켜 가므로, 가정 속에 바른 생각을 넣지 않았는지 따로 한 번 더 봅니다.
+  // 이어 묻는 질문에 "모르겠어요"만 답하면 더 묻지 않고 그 문제를 마무리합니다(선생님과 함께 더 알아봐요).
+  // 답 전체가 "모른다"는 말일 때만 해당합니다("잘 모르겠지만 군인이요"처럼 내용이 있으면 AI가 판단).
+  const DONT_KNOW = /^(음+|어+|아+|흠+|잘|진짜|정말|전혀|아직|저는|저도|전|나도|그냥|솔직히)*(몰라(요|용|여)?|모르겠(어|어요|어용|음|는데|는데요|습니다|다|네요)?|모릅니다|모름|(기억|생각)이?안나(요)?|글쎄(요)?)$/;
+  const isDontKnow = (a) => DONT_KNOW.test(String(a ?? "").replace(/[\s.,!?~…ㅠㅜㅋㅎ]/g, ""));
+
   const HYPO = /다면|라면|려면|었으면|였으면|했으면/;
   const isHypothetical = (q) => HYPO.test(String(q ?? ""));
   // 검사 AI는 먼저 가정이 그리는 상황(premise)을 적고, 그 상황이 누구 편인지(side) 고릅니다. truth일 때만 막습니다.
@@ -408,6 +413,7 @@
         const a = String(text ?? "").trim();
         if (!a) return snapshot();
         record().turns.push({ q: state.question, a });
+        if (isDontKnow(a)) { close("found"); return snapshot(); } // 모르겠다는 학생에게 더 묻지 않음
         return run(record().turns.length >= MAX_FOLLOW ? doFinal : doJudge);
       },
 
@@ -475,7 +481,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, isDontKnow, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;

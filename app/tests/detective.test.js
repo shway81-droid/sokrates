@@ -311,13 +311,13 @@ test("follow-ups: ask, ask, then final found", async () => {
   await s.select(1);
   let st = await s.submitReason("아니에요");
   assert.equal(st.step, "follow"); assert.equal(st.question, "피란 가던 사람들은 안전했을까요?");
-  st = await s.submitAnswer("몰라요");
+  st = await s.submitAnswer("피란 가던 사람은 괜찮았어요");
   assert.equal(st.question, "마을에서 싸움이 나면 누가 다칠까요?");
   st = await s.submitAnswer("군인이요");
   assert.equal(llm.calls.length, 3);
   assert.deepEqual(llm.calls[2].schema.properties.result.enum, ["solved", "found"]);
   assert.equal(st.records[0].mark, "found"); assert.equal(st.line, D.LINES.found); assert.equal(st.step, "between");
-  assert.deepEqual(st.records[0].turns.map((t) => t.a), ["몰라요", "군인이요"]);
+  assert.deepEqual(st.records[0].turns.map((t) => t.a), ["피란 가던 사람은 괜찮았어요", "군인이요"]);
 });
 
 test("follow-up answered well becomes solved", async () => {
@@ -345,11 +345,27 @@ test("two bad questions fall back to a default question and count it", async () 
   assert.equal(st.fallbacks, 1); assert.equal(st.step, "follow"); assert.equal(st.question, D.DEFAULT_QUESTIONS[0]);
 });
 
+const DONT_KNOW = ["몰라요", "모르겠어요", "잘 모르겠어요.", "음... 몰라요", "모르겠는데요", "글쎄요", "기억이 안 나요", "생각이 안 나요", "몰라요ㅠㅠ", "몰라", "모르겠습니다"];
+const NOT_DONT_KNOW = ["잘 모르겠지만 군인이요", "몰라서 그냥 썼어요", "북한군이 먼저 쳐들어왔어요", "그냥 그런 것 같아요", "아니에요", "몰랐어요 일본이 가져간 줄", "모르는 사람이 많이 죽었어요", "몰라 군인이요"];
+test("isDontKnow: only answers that just say 'I don't know'", () => {
+  for (const a of DONT_KNOW) assert.equal(D.isDontKnow(a), true, a);
+  for (const a of NOT_DONT_KNOW) assert.equal(D.isDontKnow(a), false, a);
+});
+test("follow answer 'I don't know' ends the problem at once: found, no AI call", async () => {
+  const llm = fakeLLM([ASK("피란 가던 사람들은 안전했을까요?")]);
+  const s = await started(llm);
+  await s.select(1); await s.submitReason("아니에요");
+  const st = await s.submitAnswer("모르겠어요");
+  assert.equal(llm.calls.length, 1);
+  assert.equal(st.phase, "asking"); assert.equal(st.step, "between");
+  assert.equal(st.records[0].mark, "found"); assert.equal(st.line, D.LINES.found);
+  assert.deepEqual(st.records[0].turns, [{ q: "피란 가던 사람들은 안전했을까요?", a: "모르겠어요" }]);
+});
 test("final keeps failing → found and fallback", async () => {
   const s = await started(fakeLLM([ASK("피란 가던 사람들은 안전했을까요?"), ASK("마을에서 싸움이 나면 누가 다칠까요?"),
     { result: "ask", question: "왜요?" }, { result: "bogus" }, null]));
-  await s.select(1); await s.submitReason("아니에요"); await s.submitAnswer("몰라요");
-  const st = await s.submitAnswer("몰라요");
+  await s.select(1); await s.submitReason("아니에요"); await s.submitAnswer("군인이요");
+  const st = await s.submitAnswer("군인만 다쳐요");
   assert.equal(st.records[0].mark, "found"); assert.equal(st.fallbacks, 1);
 });
 

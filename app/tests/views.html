@@ -82,7 +82,7 @@
   <script src="../methods/elenchus-views.js?v=3"></script>
   <script src="../methods/friend.js?v=9"></script>
   <script src="../methods/friend-views.js?v=7"></script>
-  <script src="../methods/detective.js?v=9"></script>
+  <script src="../methods/detective.js?v=10"></script>
   <script src="../methods/detective-views.js?v=2"></script>
   <script src="../core/app.js?v=3"></script>
   <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
@@ -207,7 +207,7 @@
         await home();
         await go(); click("시작"); await until(() => q(".dt-card"), "문제");
         await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문"); snap("follow");
-        queue(ASK("마을에서 싸움이 나면 누가 다칠까요?")); await answer("몰라요"); await until(() => asking() && asking().textContent.startsWith("마을"), "질문 2");
+        queue(ASK("마을에서 싸움이 나면 누가 다칠까요?")); await answer("피란 가던 사람은 괜찮았어요"); await until(() => asking() && asking().textContent.startsWith("마을"), "질문 2");
         queue({ result: "found" }); await answer("군인이요"); await until(() => btn("다음 문제"), "넘어가기"); snap("between-found");
         if (!btn("바로 정리하기")) throw new Error("다음 문제 화면에 [바로 정리하기]가 없음");
         click("다음 문제"); await until(() => q(".dt-card") && !q(".dt-line"), "문제 2");
@@ -228,6 +228,12 @@
         await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문");
         queue({ result: "solved" }); click("바로 정리하기"); await until(done, "이어 묻는 중 정리"); snap("follow-finish");
         if (!q(".mark.dt-solved")) throw new Error("이어 묻는 중 정리했는데 AI 마지막 판단(까닭까지 밝혔어요)이 표시되지 않음");
+        // 이어 묻는 질문에 "모르겠어요"만 답하면 AI를 부르지 않고 바로 "선생님과 함께 더 알아봐요"로 마무리합니다.
+        await home();
+        await go(); click("시작"); await until(() => q(".dt-card"), "문제");
+        await card(1); queue(ASK("피란 가던 사람들은 안전했을까요?")); reason("아니에요"); await until(asking, "이어 묻는 질문");
+        await answer("모르겠어요"); await until(() => btn("다음 문제"), "모르겠어요 뒤 마무리"); snap("follow-dontknow");
+        if (!/선생님과 함께 더 알아봐요/.test(q(".dt-line").textContent)) throw new Error("모르겠어요 뒤 마무리 문구가 다름");
       },
     };
     // 모르는 친구를 붙인 뒤 엘렌코스 시작 화면은 정리 방법 목록에 한 줄이 늘어난 것만 달라야 합니다.
