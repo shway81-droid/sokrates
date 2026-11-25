@@ -80,6 +80,14 @@ const FACT_QS = [
   "누가 만세 시위를 처음 외쳤을까요?",
   "6월 25일에 38도선을 넘어 쳐들어온 군대는 어디 군대였을까요?",
   "그 사람들은 어디 사람이었을까요?",
+  "3·1 운동을 떠올리면 누가 앞장섰을까요?",
+  "임시 정부는 왜, 언제 세워졌을까요?",
+  "이봉창은 무엇을 위해 어디에서 폭탄을 던졌을까요?",
+  "어느 도시에서 시작되었을까요?",
+  "어떤 나라가 도와주었을까요?",
+  "그 일은 몇 월에 있었을까요?",
+  "이봉창은 누구에게 폭탄을 던졌을까요?",
+  "신채호가 만든 것이 무엇인지 책 이름을 떠올려 볼 수 있나요?",
 ];
 const OPEN_QS = [
   "그럼 늘어난 쌀은 실제로 누구의 밥상에 올라갔을까요?",
@@ -94,11 +102,30 @@ const OPEN_QS = [
   "마을에서 싸움이 나면 누가 다칠까요?",
   "이봉창이 폭탄을 던진 곳을 떠올리면 어디가 걸리나요?",
   "그 문장의 어디가 실제와 다를까요?",
+  "그 문장을 다시 보면 어떤 느낌일까요?",
+  "일제는 누구를 위해서 쌀 생산을 늘렸을까요?",
+  "작전 뒤에도 의병들이 계속 싸워야 했던 까닭은 무엇일까요?",
+  "이름까지 일본식으로 바꾸게 한 일제가 학교 말은 그냥 두었을까요?",
+  "왜 그렇게 생각했는지 더 말해 줄래요?",
 ];
 test("fact check: questions that make the student recall one fact are caught", () => {
   for (const q of FACT_QS) assert.equal(D.isFactQuestion(q), true, q);
   for (const q of OPEN_QS) assert.equal(D.isFactQuestion(q), false, q);
 });
+const LEADING_QS = [
+  "늘어난 쌀은 일본에 많이 보내지지 않았을까요?",
+  "전쟁은 북한이 먼저 일으키지 않았을까요?",
+  "임시 정부는 3·1 운동 뒤에 세워지지 않았을까요?",
+  "새 건물은 일본인이 많은 곳에 있지 않았나요?",
+  "그 일을 한 사람은 다른 사람이 아니었을까요?",
+  "쌀을 가져간 것은 일본이 아닐까요?",
+];
+test("leading check: '~지 않았을까요?' questions that hint the answer are caught", () => {
+  for (const q of LEADING_QS) assert.equal(D.isLeading(q), true, q);
+  for (const q of [...OPEN_QS, "그 문장이 맞는지 다시 읽어 볼까요?"]) assert.equal(D.isLeading(q), false, q);
+});
+test("validate: leading question is rejected with a reason", () =>
+  bad({ result: "ask", question: "늘어난 쌀은 일본에 많이 보내지지 않았을까요?" }, expectJ({ leakWords: [] }), /넌지시/));
 test("validate: fact-recall question is rejected with a reason", () =>
   bad({ result: "ask", question: "그럼 5·10 총선거로는 무엇을 뽑았을까요?" }, expectJ({ leakWords: [] }), /사실/));
 test("prompt examples do not teach the fact-recall form", () => {
@@ -395,6 +422,19 @@ test("next goes to problem 2, then done after the last", async () => {
   assert.equal(st.phase, "done"); assert.deepEqual(st.records.map((r) => r.mark), ["solved", "solved"]);
 });
 
+test("last problem's closing line points to the result, not a next problem", async () => {
+  const one = () => D.createSession({ topic: UNIT, textbookId: "chunjae", lessonId: "3-2", llm: fakeLLM([SOLVED]), problems: FIXTURE, served: new Set(), random: () => 0 });
+  let s = one(); let st = await s.start();
+  await s.select(st.problems[0].hidden);
+  st = await s.submitReason("군인들이 의병에 들어가 더 활발해졌어요");
+  assert.equal(st.line, D.LINES.solvedEnd); assert.doesNotMatch(st.line, /다음 문제/);
+  s = one(); st = await s.start();
+  const wrong = [0, 1, 2, 3].filter((i) => i !== st.problems[0].hidden);
+  await s.select(wrong[0]); await s.submitReason("이상해요");
+  await s.select(wrong[1]); st = await s.submitReason("이것도요");
+  assert.equal(st.records[0].mark, "together");
+  assert.equal(st.line, D.LINES.wrongEnd); assert.doesNotMatch(st.line, /다음 문제/);
+});
 test("one-problem session ends after the first", async () => {
   const s = D.createSession({ topic: UNIT, textbookId: "chunjae", lessonId: "3-2", llm: fakeLLM([SOLVED]), problems: FIXTURE, served: new Set(), random: () => 0 });
   let st = await s.start();

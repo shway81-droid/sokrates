@@ -18,6 +18,8 @@
     wrongFirst: "생각을 말해 줘서 고마워요. 다른 문장도 다시 읽어 볼까요?",
     wrongLast: "이 문제는 선생님과 함께 알아봐요. 다음 문제로 가 볼까요?",
     solved: "까닭까지 찾아냈어요! 다음 문제로 가 볼까요?",
+    solvedEnd: "까닭까지 찾아냈어요! 결과를 볼까요?", // 마지막 문제: 버튼이 [결과 보기]
+    wrongEnd: "이 문제는 선생님과 함께 알아봐요. 결과를 볼까요?",
     found: "이상한 곳을 찾았어요. 까닭은 선생님과 함께 더 알아봐요.",
   };
   // 이어 묻는 질문이 검사에 두 번 걸리면 쓰는 기본 질문(이미 한 질문은 다시 쓰지 않음)
@@ -77,18 +79,27 @@
     });
   }
 
-  // 사실 하나를 떠올려 맞히게 하는 질문(언제·누가·무엇을·어디에서·어떤 일을 한…)은 퀴즈입니다.
-  // "~다면/~려면"처럼 학생 주장이 맞을 때의 결과를 묻는 가정과, 까닭·목적("누구를 위해서")을 묻는 질문은 괜찮습니다.
-  const FACT = /언제|누구(가|를|였|일까|인가)|무엇(을|이었|일까|인가)|어디(에서|서|였|일까|로)(?!든)|어떤\s*일을\s*(한|했)|어떤\s*\S+(일까요|인가요)\s*[?？]\s*$|어느\s+\S+(\s+\S+)?(였을까요|이었을까요|일까요|인가요)\s*[?？]\s*$|어디\s+\S+(\s+\S+)?(였을까요|이었을까요|일까요|인가요)\s*[?？]\s*$|어느\s*나라|몇\s*\S*(년|명|개|나라|번)/;
-  const NOT_FACT = /다면|라면|려면|었으면|였으면|했으면|까닭|이유|왜|위해/;
+  // 사실 하나를 떠올려 맞히게 하는 질문(언제·누가·무엇을·어디에서·어떤 일을 한·이름…)은 퀴즈입니다.
+  // "~다면/~려면"처럼 학생 주장이 맞을 때의 결과를 묻는 가정은 괜찮습니다.
+  // 까닭·목적을 묻는 말("왜", "누구를 위해서")은 그 부분만 빼고 봅니다("왜, 언제…"처럼 사실 낱말이 함께 있으면 퀴즈).
+  // "어떤 느낌/마음/기분/생각일까요?"는 학생 생각을 묻는 것이라 괜찮습니다.
+  const FACT = /언제|누구(가|를|에게|한테|와|였|일까|인가)|무엇(을|이었|일까|인가|인지)|어디(에서|서|였|일까|로)(?!든)|어떤\s*일을\s*(한|했)|어떤\s*(?!느낌|마음|기분|생각)\S+(일까요|인가요)\s*[?？]\s*$|어느\s+\S+(\s+\S+)?(였을까요|이었을까요|일까요|인가요)\s*[?？]\s*$|어느\s+\S+(에서|으로|로)(?=\s)|어디\s+\S+(\s+\S+)?(였을까요|이었을까요|일까요|인가요)\s*[?？]\s*$|(어느|어떤)\s*나라|몇\s*\S*(년|명|개|나라|번|월|일|살)|이름(은|이|을)?\s*(무엇|뭐|떠올|말해|알고|기억)/;
+  const NOT_FACT = /다면|라면|려면|었으면|였으면|했으면/;
+  const WHY = /(까닭|이유)(은|이|는)?\s*무엇\S*|(누구|무엇)(를|을)\s*위해(서)?|왜|까닭|이유/g;
   // 줄임꼴 "누가"도 사람 하나를 맞히게 합니다. 다만 "싸움이 나면 누가 다칠까요?"처럼 ~면 뒤의 결과를 묻거나
-  // "누가 한 일이 이상한지"처럼 문장을 다시 보게 하는 질문은 괜찮습니다.
+  // "누가 한 일이 이상한지"처럼 문장을 다시 보게 하는 질문은 괜찮습니다. "떠올리면/보면"은 결과를 묻는 ~면이 아닙니다.
   const WHO = /(^|[\s,])누가(?=\s|$)/;
   const NOT_WHO = /[가-힣]면\s|이상한지|다른지|달라/;
+  const LOOKING = /(떠올리|다시\s*보|살펴보|보|생각하|읽으)면\s/g;
   const isFactQuestion = (q) => {
     const s = String(q ?? "");
-    return (FACT.test(s) || (WHO.test(s) && !NOT_WHO.test(s))) && !NOT_FACT.test(s);
+    if (NOT_FACT.test(s)) return false;
+    const t = s.replace(WHY, " ");
+    return FACT.test(t) || (WHO.test(t) && !NOT_WHO.test(t.replace(LOOKING, " ")));
   };
+  // "~지 않았을까요?", "~아닐까요?"처럼 답을 넌지시 알려 주며 맞장구를 기다리는 질문도 정답을 말하는 셈입니다.
+  const LEADING = /(지\s*않(았)?(을까요|나요)|아니(었)?을까요|아닐까요|아니었나요)\s*[?？]?\s*$/;
+  const isLeading = (q) => LEADING.test(String(q ?? "").trim());
 
   // 가정 질문("~다면/~라면/~려면")은 사실 묻기 검사를 비켜 가므로, 가정 속에 바른 생각을 넣지 않았는지 따로 한 번 더 봅니다.
   // 이어 묻는 질문에 "모르겠어요"만 답하면 더 묻지 않고 그 문제를 마무리합니다(선생님과 함께 더 알아봐요).
@@ -133,6 +144,8 @@
     const q = G.checkQuestion(out.question);
     if (!q.ok) return fail(q.reason);
     if (isChoice(out.question)) return fail("둘 중 하나를 고르게 하는 질문임 — 질문 하나로만 물을 것");
+    if (isLeading(out.question))
+      return fail("\"~지 않았을까요?\"처럼 답을 넌지시 알려 주는 질문임 — 답을 담지 말고 학생이 스스로 말하게 물을 것");
     if (isFactQuestion(out.question))
       return fail("사실 하나(언제·누가·무엇을·어디·어떤 일)를 맞히게 하는 퀴즈 질문임 — 학생 말이 맞다면 어떤 일이 생기는지, 또는 왜 그렇게 생각했는지 물을 것");
     if ((expect.asked || []).some((a) => squash(a) === squash(out.question)))
@@ -328,7 +341,9 @@
 
     function close(mark) {
       record().mark = mark;
-      Object.assign(state, { step: "between", line: LINES[mark === "together" ? "wrongLast" : mark], question: null, selected: null });
+      const last = state.index + 1 >= state.problems.length;
+      const key = mark === "together" ? (last ? "wrongEnd" : "wrongLast") : mark === "solved" && last ? "solvedEnd" : mark;
+      Object.assign(state, { step: "between", line: LINES[key], question: null, selected: null });
     }
 
     async function doJudge() {
@@ -481,7 +496,7 @@
 
   const SokDetective = {
     id: "detective", name: "오답 탐정", ERROR_MESSAGE, PROBLEM_COUNT, MAX_FOLLOW, MAX_WRONG, MARK_TEXT, LINES, DEFAULT_QUESTIONS,
-    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, isDontKnow, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
+    SYSTEM_PROMPT, SERVED, schemaFor, validateDetectiveStep, isChoice, isFactQuestion, isHypothetical, isDontKnow, isLeading, PREMISE_SCHEMA, PREMISE_SYSTEM, leakIn, leakWordsFor, pickProblems, createSession, resultText, detectiveHelp,
   };
   if (isNode) module.exports = SokDetective;
   else root.SokDetective = SokDetective;

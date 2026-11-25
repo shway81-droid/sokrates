@@ -222,6 +222,9 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .dt-guide p { margin: 4px 0; font-size: 28px; }
 .dt-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .dt-head h2 { margin: 0; }
+/* 공통 진행 점은 청록 카드 위의 흰 점이라, 크림 바탕인 문제 머리에서는 색을 바꿔 보이게 합니다. */
+.dt-head .dots i { background: var(--line); }
+.dt-head .dots i.on { background: var(--accent); }
 .dt-lead { margin: 0; font-size: 28px; font-weight: 700; color: var(--ink-soft); }
 .dt-cards { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
 .dt-card {
@@ -231,7 +234,7 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 }
 button.dt-card { cursor: pointer; box-shadow: var(--shadow); }
 button.dt-card:hover:not(:disabled) { border-color: var(--accent); }
-.dt-card .num { font-weight: 800; color: var(--accent); }
+.dt-card .num { font-weight: 800; color: var(--accent); width: 48px; height: 48px; } /* 카드의 번호 칸(48px)에 맞춤 */
 .dt-card.picked { border-color: var(--accent); background: var(--accent-soft); }
 .dt-card.looked { opacity: .45; box-shadow: none; cursor: default; }
 .dt-card.found { border-color: var(--ok); background: var(--ok-soft); }
@@ -252,6 +255,7 @@ button.dt-card:hover:not(:disabled) { border-color: var(--accent); }
 .mark.dt-together { background: var(--amber-soft); color: var(--amber); }
 @media (max-width: 760px) {
   .dt-card { font-size: 26px; grid-template-columns: 36px 1fr; }
+  .dt-card .num { width: 36px; height: 36px; font-size: 22px; }
   .dt-head { flex-wrap: wrap; }
 }
 @media print {

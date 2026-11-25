@@ -78,6 +78,7 @@ test("leakWords present and absent from every sentence", () => {
 test("hints pass the session's fact-recall check (AI may copy them)", () => {
   const D = require(path.join(__dirname, "..", "methods", "detective.js"));
   for (const p of problems) for (const h of p.hints) assert.equal(D.isFactQuestion(h), false, `${p.id}: ${h}`);
+  for (const p of problems) for (const h of p.hints) assert.equal(D.isLeading(h), false, `${p.id} (넌지시 알려 주는 꼴): ${h}`);
 });
 
 test("all reviewed", () => {
