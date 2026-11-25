@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>실제 AI 점검 (모르는 친구)</title>
+  <style>
+    :root { --bg: #fbf6ec; --paper: #fffdf8; --ink: #2b2118; --soft: #6b5a48; --line: #e6d9c3; --accent: #1f6f6b; --same: #2f7a3e; --diff: #a65f00; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Noto Sans KR", "Malgun Gothic", sans-serif; }
+    main { max-width: 1440px; margin: 0 auto; padding: 24px 16px 48px; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    .lead, .note { color: var(--soft); }
+    .note { background: #fff1d6; border-radius: 10px; padding: 10px 14px; color: #6b4300; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 16px 0; }
+    button { font: inherit; font-weight: 700; padding: 10px 20px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+    button.secondary { background: var(--paper); color: var(--ink); border: 2px solid var(--line); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--paper); }
+    th, td { border: 1px solid var(--line); padding: 8px 10px; vertical-align: top; text-align: left; }
+    th { background: #f3eadb; white-space: nowrap; }
+    td.same { color: var(--same); font-weight: 700; }
+    td.diff { color: var(--diff); font-weight: 700; }
+    td p { margin: 0 0 6px; }
+    .k { color: var(--soft); font-size: 13px; }
+    .bad { color: var(--diff); font-weight: 700; }
+    #summary { font-weight: 700; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>실제 AI 점검 (모르는 친구)</h1>
+  <p class="lead">가상 학생 <span id="count"></span>명의 설명을 실제 Claude에 차례로 보내고, 친구의 질문·표시가 기대와 같은지 봅니다. 학생 이름은 쓰지 않습니다.</p>
+  <p id="key-note" class="note" hidden>저장된 API 키가 없어요. <a href="../index.html">앱</a>의 [설정]에서 키를 넣고 이 페이지를 새로 고쳐 주세요.</p>
+  <p id="settings" class="lead"></p>
+  <div class="row">
+    <button id="run" type="button">모두 실행</button>
+    <button id="copy" type="button" class="secondary" disabled>결과를 표(Markdown)로 복사</button>
+    <span id="summary" aria-live="polite"></span>
+  </div>
+  <div class="wrap">
+    <table>
+      <thead><tr><th>#</th><th>경우</th><th>설명</th><th>질문 (종류 · 반응 · 글자 수)</th><th>답</th><th>표시</th><th>기대</th><th>일치</th><th>한마디</th><th>다음 시간</th><th>대체</th><th>호출</th><th>시간</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script src="../data/units.js"></script>
+<script src="../data/topic-3-1.js"></script>
+<script src="../data/topic-3-2.js"></script>
+<!-- 교과서 원문: 선생님 PC에만 있는 파일(tools/build_local_texts.py로 만듦). 없으면 요약 개념만으로 판단합니다. -->
+<script src="../local/texts.js" onerror="this.remove()"></script>
+<script src="../core/guard.js"></script>
+<script src="../core/topic.js"></script>
+<script src="../core/catalog.js"></script>
+<script src="../core/llm.js"></script>
+<script src="../core/ui.js?v=3"></script>
+<script src="../methods/friend.js?v=8"></script>
+<script src="live-cases.js"></script>
+<script src="live-friend-cases.js?v=1"></script>
+<script>
+(function () {
+  const L = window.SokLLM, G = window.SokGuard, F = window.SokFriend, C = window.SokCatalog;
+  const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
+  const cases = window.SokLiveFriendCases.cases, QUIZ = window.SokLiveCases.QUIZ;
+  const settings = L.loadSettings();
+  // ?model=claude-haiku-5-5 처럼 주면 저장된 설정은 그대로 두고 이 페이지에서만 모델을 바꿉니다.
+  const forced = new URLSearchParams(location.search).get("model");
+  if (forced) settings.model = forced;
+  const $ = (id) => document.getElementById(id);
+  const results = [];
+  const KIND = { meaning: "뜻·까닭", more: "더 말해", retry: "다시 말해", mixup: "잘못 알아듣기" };
+
+  $("settings").textContent = `모델 ${settings.model} · 노력 ${settings.effort}`;
+  $("count").textContent = cases.length;
+  if (!settings.apiKey) { $("key-note").hidden = false; $("run").disabled = true; }
+
+  // 기대: has(반드시 나올 표시), at(그 질문의 표시), allTogether(모두 "함께 더 알아봐요"), firstKind(첫 질문 종류)
+  function expectOk(e, turns) {
+    const marks = turns.map((t) => t.mark);
+    if (e.has && !e.has.every((m) => marks.includes(m))) return false;
+    if (e.at && !Object.entries(e.at).every(([i, m]) => marks[i] === m)) return false;
+    if (e.allTogether && !marks.filter(Boolean).every((m) => m === "together")) return false;
+    if (e.firstKind && !(turns[0] && e.firstKind.includes(turns[0].kind))) return false;
+    return true;
+  }
+  const expectText = (e) => [
+    e.has && `나옴: ${e.has.join(",")}`,
+    e.at && Object.entries(e.at).map(([i, m]) => `${+i + 1}번 ${m}`).join(","),
+    e.allTogether && "모두 together",
+    e.firstKind && `첫 질문 ${e.firstKind.join("/")}`,
+  ].filter(Boolean).join(" · ");
+
+  async function runCase(c) {
+    const llm = L.createClaudeLLM(settings);
+    let calls = 0;
+    let cause = null; // 실제 오류 원인(상태 코드와 API 메시지). 키는 들어 있지 않습니다.
+    const counted = { async call(req) {
+      calls++;
+      try { return await llm.call(req); } catch (e) { cause = String((e && e.message) || e).slice(0, 300); throw e; }
+    } };
+    const t0 = performance.now();
+    const sc = C.resolve(UNITS, TOPICS, { textbookId: c.textbookId, unitId: c.unitId, key: c.key });
+    const s = F.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted,
+      sourceText: C.sourceText(window.SOKRATES_TEXTS, sc.textbookId, sc.choice.lessonId) });
+    let st = await s.submitExplanation(c.explanation);
+    let i = 0;
+    while (st.phase === "asking") {
+      if (st.kind === "mixup") st = await s.submitAnswer((c.byMisc && c.byMisc[st.misconception]) || c.mixup);
+      else st = i < c.answers.length ? await s.submitAnswer(c.answers[i++]) : await s.finishNow();
+    }
+    const ms = performance.now() - t0;
+    const turns = st.turns || [];
+    const quiz = turns.filter((t) => QUIZ.test(t.q)).length;
+    const q2mix = turns.length < 2 || turns[1].kind === "mixup";
+    const ok = st.phase === "done" && expectOk(c.expect, turns);
+    // 검사에 걸려 기본값으로 대신했거나, 이름·숫자 퀴즈를 냈거나, 2번이 잘못 알아듣기가 아니면 "다름"으로 셉니다.
+    const same = ok && st.fallbacks === 0 && quiz === 0 && q2mix;
+    return { c, st, turns, calls, ms, same, ok, quiz, q2mix, cause };
+  }
+
+  function cell(content, cls) {
+    const td = document.createElement("td");
+    if (Array.isArray(content)) content.forEach((n) => td.append(n)); else td.textContent = content;
+    if (cls) td.className = cls;
+    return td;
+  }
+  function para(text, cls) { const p = document.createElement("p"); p.textContent = text; if (cls) p.className = cls; return p; }
+  const qLine = (t, i) => `${i + 1}. [${KIND[t.kind] || t.kind}${t.misconception ? " " + t.misconception : ""}] ${t.reaction ? `(${t.reaction}) ` : ""}${t.q} (${G.charLen(t.q)})`;
+
+  function render(n, r) {
+    const tr = document.createElement("tr");
+    tr.append(cell(String(n)), cell(r.c.name), cell(r.c.explanation));
+    tr.append(cell(r.turns.map((t, i) => para(qLine(t, i), QUIZ.test(t.q) || G.charLen(t.q) > G.MAX_CHARS ? "bad" : ""))));
+    tr.append(cell(r.turns.map((t, i) => para(`${i + 1}. ${t.a}`))));
+    tr.append(cell(r.st.phase === "error" ? `오류: ${r.cause || r.st.error}` : r.turns.map((t) => t.mark || "-").join(" / ")));
+    tr.append(cell(expectText(r.c.expect)));
+    tr.append(cell(r.same ? "같음" : "다름", r.same ? "same" : "diff"));
+    tr.append(cell(r.st.thanks || "-"), cell(r.st.nextQuestion || "-"));
+    tr.append(cell(String(r.st.fallbacks), r.st.fallbacks ? "diff" : ""), cell(String(r.calls)), cell(`${(r.ms / 1000).toFixed(1)}초`));
+    $("rows").append(tr);
+  }
+
+  function markdown() {
+    const esc = (s) => String(s).replace(/\|/g, "\\|").replace(/\n/g, " ");
+    const out = [`모델 ${settings.model} · 노력 ${settings.effort} · ${new Date().toISOString().slice(0, 10)}`, "",
+      "| # | 경우 | 설명 | 질문 (종류 · 반응 · 글자 수) | 답 | 표시 | 기대 | 일치 | 한마디 | 다음 시간 | 대체 | 호출 | 시간 |",
+      "|---|---|---|---|---|---|---|---|---|---|---|---|---|"];
+    results.forEach((r, i) => out.push(`| ${i + 1} | ${esc(r.c.name)} | ${esc(r.c.explanation)} | ${r.turns.map((t, j) => esc(qLine(t, j))).join("<br>")} | ${r.turns.map((t, j) => `${j + 1}. ${esc(t.a)}`).join("<br>")} | ${r.st.phase === "error" ? `오류: ${esc(r.cause || "")}` : r.turns.map((t) => t.mark || "-").join("/")} | ${expectText(r.c.expect)} | ${r.same ? "같음" : "다름"} | ${esc(r.st.thanks || "-")} | ${esc(r.st.nextQuestion || "-")} | ${r.st.fallbacks} | ${r.calls} | ${(r.ms / 1000).toFixed(1)}초 |`));
+    out.push("", summaryText());
+    return out.join("\n");
+  }
+
+  function summaryText() {
+    const same = results.filter((r) => r.same).length;
+    const fb = results.reduce((n, r) => n + r.st.fallbacks, 0);
+    const quiz = results.reduce((n, r) => n + r.quiz, 0);
+    const long = results.flatMap((r) => r.turns).filter((t) => G.charLen(t.q) > G.MAX_CHARS).length;
+    const err = results.filter((r) => r.st.phase === "error").length;
+    const groups = [...new Set(results.map((r) => r.c.group))].map((g) => {
+      const rs = results.filter((r) => r.c.group === g);
+      return `${g} ${rs.filter((r) => r.same).length}/${rs.length}`;
+    }).join(" · ");
+    return `일치 ${same}/${results.length} (${groups}) · 퀴즈형 질문 ${quiz}개 · 40자 넘는 질문 ${long}개 · 기본값 대체 ${fb}번 · 오류 ${err}건`;
+  }
+
+  async function runAll(list) {
+    $("run").disabled = true; $("copy").disabled = true; $("rows").textContent = ""; results.length = 0;
+    for (let i = 0; i < list.length; i++) {
+      $("summary").textContent = `${i + 1}/${list.length} 실행 중…`;
+      const r = await runCase(list[i]);
+      results.push(r); render(i + 1, r);
+    }
+    $("summary").textContent = summaryText();
+    $("run").disabled = false; $("copy").disabled = false;
+  }
+  window.__friendLive = { results, runAll, cases, markdown };
+
+  $("run").addEventListener("click", () => runAll(cases));
+  $("copy").addEventListener("click", async () => {
+    const text = markdown();
+    try { await navigator.clipboard.writeText(text); $("summary").textContent = "복사했어요 · " + summaryText(); }
+    catch { const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+  });
+})();
+</script>
+</body>
+</html>

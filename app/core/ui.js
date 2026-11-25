@@ -57,11 +57,16 @@
   // lessonId: 오늘 차시(단원 마무리면 null). 오개념을 못 찾으면 오늘 차시나 차시 목록을 가리킵니다.
   function teacherHelp(topic, textbookId, state, lessonId = null) {
     if (!state || (state.verdict !== "hold" && state.verdict !== "revisit")) return null;
+    const item = state.target != null && state.items ? state.items[state.target] || null : null;
+    return helpFor(topic, textbookId, { item, misconception: state.misconception, lessonId });
+  }
+
+  // 도움말 계산(엘렌코스·모르는 친구가 함께 씀): item 살펴볼 생각, misconception 오개념 id(없으면 null), lessonId 오늘 차시
+  function helpFor(topic, textbookId, { item = null, misconception = null, lessonId = null }) {
     const tb = topic.textbooks.find((t) => t.id === textbookId);
     if (!tb) return null;
     const findLesson = (id) => tb.lessons.find((l) => l.id === id);
-    const item = state.target != null && state.items ? state.items[state.target] || null : null;
-    const m = state.misconception && topic.misconceptions.find((x) => x.id === state.misconception);
+    const m = misconception && topic.misconceptions.find((x) => x.id === misconception);
     const src = m && m.sources[textbookId];
     const lesson = src && findLesson(src.lesson);
     // 바로 설명할 내용: 고른 교과서에 실린 개념 문장과 그 쪽(교과서 대조 검증을 마친 문장)
@@ -91,7 +96,7 @@
     return node;
   }
 
-  const SokUI = { VERDICT_TEXT, verdictText, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp, el };
+  const SokUI = { VERDICT_TEXT, verdictText, CHECK_TEXT, SUMMARY_LABELS, formatElapsed, rethink, resultText, teacherHelp, helpFor, el };
   if (typeof module !== "undefined" && module.exports) module.exports = SokUI;
   else root.SokUI = SokUI;
 })(this);

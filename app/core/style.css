@@ -169,6 +169,21 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
 .helper .notes li { margin: 4px 0; line-height: 1.5; }
 .helper .notes .page { color: #6b4300; white-space: nowrap; }
 .record summary { cursor: pointer; font-weight: 700; }
+/* 모르는 친구 */
+.explain-box { font-size: 26px; color: var(--ink-soft); border-left: 6px solid var(--accent); padding-left: 20px; }
+.explain-box .k { display: block; font-weight: 800; color: var(--accent); }
+.explain-box p { margin: 2px 0 0; color: var(--ink); }
+.qcard .reaction { font-size: 28px; opacity: .9; margin-top: 6px; }
+.marks { list-style: none; padding: 0; margin: 0; }
+.marks li { display: grid; grid-template-columns: 56px 1fr auto; gap: 16px; align-items: start; padding: 12px 0; border-bottom: 2px dashed var(--line); }
+.marks li:last-child { border-bottom: 0; }
+.marks .qa p { margin: 0; }
+.marks .qa .a { font-size: 26px; color: var(--ink-soft); }
+.mark { font-size: 24px; font-weight: 800; padding: 4px 14px; border-radius: 999px; white-space: nowrap; }
+.mark.explained { background: var(--ok-soft); color: var(--ok); }
+.mark.corrected { background: var(--accent-soft); color: var(--accent); }
+.mark.together { background: var(--amber-soft); color: var(--amber); }
+.helper .section + .section { margin-top: 18px; padding-top: 4px; border-top: 2px dashed #f0c27a; }
 .toast {
   position: fixed; left: 50%; bottom: 32px; transform: translateX(-50%); background: var(--ink); color: var(--paper);
   padding: 12px 28px; border-radius: 999px; font-size: 24px;
@@ -180,6 +195,8 @@ input:focus, select:focus, textarea:focus, button:focus-visible {
   main { padding: 20px 16px 48px; }
   .summary li { grid-template-columns: 1fr; gap: 4px; }
   .qcard .q { font-size: 34px; }
+  .marks li { grid-template-columns: 40px 1fr; }
+  .marks .mark { grid-column: 2; justify-self: start; }
 }
 
 /* A4 한 장 인쇄: 결과만 */

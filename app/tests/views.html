@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>화면 확인 (가짜 AI)</title>
+  <link rel="stylesheet" href="../core/style.css?v=3">
+  <style>
+    #harness { margin: 24px; padding: 16px; border: 3px dashed #999; font: 16px/1.5 monospace; background: #fff; color: #222; }
+    #harness pre { white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <!--
+    화면 확인 페이지: 키 없이 가짜 AI로 각 방법의 화면을 차례로 띄우고 #screen 의 HTML 을 찍습니다.
+    - ?run=elenchus            장면 HTML 을 #out 에 JSON 으로 냅니다.
+    - ?run=elenchus&compare=1  tests/fixtures/elenchus-views-baseline.js 와 비교합니다.
+    - &stop=장면이름           그 장면에서 멈춰 화면을 그대로 둡니다(스크린샷용).
+    이 페이지는 localStorage 에 아무것도 쓰지 않습니다(저장된 키·선택값을 건드리지 않음).
+  -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">?</span>
+      <span class="brand-name">소크라테스 학습정리</span>
+      <span class="brand-method" id="bar-method"></span>
+    </div>
+    <div class="bar-right">
+      <span class="chip" id="bar-context" hidden></span>
+      <span class="timer" id="bar-timer" hidden aria-label="지난 시간">0:00</span>
+      <button class="icon-btn" id="bar-home" type="button" hidden>처음으로</button>
+      <button class="icon-btn" id="bar-settings" type="button">설정</button>
+    </div>
+  </header>
+
+  <main id="screen" aria-live="polite"></main>
+
+  <section id="harness"><b id="status">준비 중…</b><pre id="out"></pre></section>
+
+  <script>
+    // 저장소를 읽기만 하고 쓰지 않게 합니다. sok.* 선택값은 없는 것으로 봅니다(장면마다 같은 시작 화면).
+    (function () {
+      const get = Storage.prototype.getItem;
+      Storage.prototype.setItem = function () {};
+      Storage.prototype.removeItem = function () {};
+      Storage.prototype.getItem = function (k) { return String(k).startsWith("sok.") ? null : get.call(this, k); };
+    })();
+  </script>
+  <script src="../data/units.js"></script>
+  <script src="../data/topic-3-1.js"></script>
+  <script src="../data/topic-3-2.js"></script>
+  <script src="../core/guard.js"></script>
+  <script src="../core/topic.js"></script>
+  <script src="../core/catalog.js"></script>
+  <script src="../core/llm.js"></script>
+  <script>
+    // 가짜 AI: window.FAKE_QUEUE 의 응답을 차례로 돌려줍니다. Error 면 throw, "PENDING" 이면 끝나지 않습니다.
+    window.FAKE_QUEUE = [];
+    window.FAKE_CALLS = [];
+    (function (L) {
+      L.loadSettings = () => ({ apiKey: "fake", model: "claude-haiku-5-5", effort: "low" });
+      L.saveSettings = () => {};
+      L.clearKey = () => {};
+      L.createClaudeLLM = () => ({
+        call(req) {
+          window.FAKE_CALLS.push(req);
+          const r = window.FAKE_QUEUE.shift();
+          if (r === "PENDING") return new Promise(() => {});
+          if (r === undefined) return Promise.reject(new Error("가짜 응답이 더 없음"));
+          if (r instanceof Error) return Promise.reject(r);
+          return Promise.resolve(JSON.parse(JSON.stringify(r)));
+        },
+      });
+    })(window.SokLLM);
+    delete window.SOKRATES_TEXTS;
+  </script>
+  <script src="../core/ui.js?v=3"></script>
+  <script src="../core/parts.js?v=3"></script>
+  <script src="../methods/elenchus.js"></script>
+  <script src="../methods/elenchus-views.js?v=3"></script>
+  <script src="../methods/friend.js?v=8"></script>
+  <script src="../methods/friend-views.js?v=7"></script>
+  <script src="../core/app.js?v=3"></script>
+  <script src="fixtures/elenchus-views-baseline.js" onerror="this.remove()"></script>
+  <script>
+  (async function () {
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    const run = params.get("run") || "elenchus";
+    const stopAt = params.get("stop");
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function until(pred, what) {
+      for (let i = 0; i < 100; i++) { if (pred()) return; await sleep(20); }
+      throw new Error(`기다림 시간 초과: ${what}`);
+    }
+    const q = (sel) => document.querySelector(`#screen ${sel}`);
+    const btn = (text) => [...document.querySelectorAll("#screen button")].find((b) => b.textContent === text);
+    const click = (text) => { const b = btn(text); if (!b) throw new Error(`버튼 없음: ${text}`); b.click(); };
+    const normalize = (html) => html.replace(/\d+:\d\d/g, "0:00").replace(/\d{4}-\d{2}-\d{2}/g, "DATE");
+    const shots = {};
+    const snap = (name) => { shots[name] = normalize($("screen").innerHTML); if (name === stopAt) throw "STOP"; };
+    const queue = (...r) => window.FAKE_QUEUE.push(...r);
+    const home = async () => { $("bar-home").click(); await until(() => btn("시작하기"), "시작 화면"); };
+    const begin = async () => { click("시작하기"); await until(() => q("#item-0") || q("#explain"), "입력 화면"); };
+    const fill = (sel, values) => values.forEach((v, i) => { q(sel(i)).value = v; });
+
+    // ---------- 엘렌코스 장면 ----------
+    const three = ["북한이 남침했다", "유엔군이 도와주었다", "전쟁은 1953년에 끝났다"];
+    const SUM = { learned: "북한의 남침과 국제 연합군의 참전", rethought: "1953년에 전쟁이 끝난 게 아니라 멈췄다", nextQuestion: "정전과 종전은 어떻게 다를까요?" };
+    const CHECK = { stage: "check", checks: ["ok", "ok", "think"], target: 2, mode: "counter", misconception: "3-2.m01", question: "전쟁이 끝났다면 왜 지금도 휴전선이 있을까요?" };
+    const Q2 = { stage: "question", question: "아직 나뉘어 있다면 전쟁이 끝난 것일까요?", verdict: "none", summary: { learned: "", rethought: "", nextQuestion: "" } };
+    const V = (v, s = SUM) => ({ stage: "verdict", question: "", verdict: v, summary: s });
+    const REASON = { stage: "check", checks: ["ok", "ok", "ok"], target: 0, mode: "reason", misconception: "none", question: "북한은 왜 쳐들어왔을까요?" };
+    const RETRY = { stage: "check", checks: ["ok", "outside", "outside"], target: 1, mode: "retry", misconception: "none", question: "오늘 배운 것 중에서 하나 더 말해 볼까요?" };
+
+    async function submitElenchus(items) {
+      fill((i) => `#item-${i}`, items);
+      click("확인하기");
+    }
+    async function answer(text) {
+      q("#answer").value = text;
+      click("보내기");
+    }
+    const asking = () => q(".qcard .q");
+    const done = () => btn("다음 학생");
+
+    const SCENES = {
+      async elenchus() {
+        snap("start");
+        // 6·25 오개념(3-2.m01)이 범위에 들도록 천재 12차시를 고릅니다(도움말에 교과서 내용이 나오는 장면).
+        const lesson = q("#lesson"); lesson.value = "3-12"; lesson.dispatchEvent(new Event("change"));
+        await until(() => q("#lesson") && q("#lesson").value === "3-12", "12차시");
+        await begin(); snap("input");
+        queue("PENDING"); await submitElenchus(three); await until(() => q(".thinking"), "생각 중"); snap("waiting");
+        await home();
+        await begin(); queue(CHECK); await submitElenchus(three); await until(asking, "질문 1"); snap("asking-1");
+        queue(Q2); await answer("아직 남북이 나뉘어 있어서요."); await until(() => q(".history") && asking(), "질문 2"); snap("asking-2");
+        queue(V("revisit")); await answer("아, 싸움만 멈춘 거네요."); await until(done, "결과"); snap("result-revisit");
+        await home();
+        await begin(); queue(REASON, V("strong", { learned: "북한이 38도선을 넘어 쳐들어왔다", rethought: "힘으로 통일하려고 쳐들어왔다", nextQuestion: "전쟁은 사람들의 삶을 어떻게 바꾸었을까요?" }));
+        await submitElenchus(three); await until(asking, "이유 질문");
+        await answer("힘으로 통일하려고요."); await until(done, "결과"); snap("result-strong-reason");
+        await home();
+        await begin(); queue(RETRY, V("hold", { learned: "북한이 남침했다", rethought: "전쟁에 참여한 나라를 더 떠올려 보아요", nextQuestion: "국제 연합군은 왜 왔을까요?" }));
+        await submitElenchus(["북한이 남침했다", "몰라요", "그냥요"]); await until(asking, "다시 말하기");
+        click("바로 정리하기"); await until(done, "결과"); snap("result-hold-retry");
+        await home();
+        await begin(); queue(new Error("연결 실패")); await submitElenchus(three); await until(() => q(".error-box"), "오류"); snap("error");
+        $("bar-settings").click(); await until(() => q("#api-key"), "설정"); snap("settings");
+      },
+
+      // ---------- 모르는 친구 장면 (천재 12차시) ----------
+      async friend() {
+        const pick = async (id, value) => { const s = q(id); s.value = value; s.dispatchEvent(new Event("change")); await until(() => q(id) && q(id).value === value, id); };
+        await pick("#method", "friend");
+        await pick("#lesson", "3-12");
+        snap("start");
+        const EXPLAIN = "북한이 쳐들어와서 전쟁이 났고 많은 사람이 다쳤어요.";
+        const ASK1 = { stage: "ask", mark: "none", kind: "meaning", misconception: "none", reaction: "", question: "전쟁이 나면 왜 사람들이 다쳐요?" };
+        const ASK2 = { stage: "ask", mark: "explained", kind: "mixup", misconception: "3-2.m06", reaction: "아, 그렇구나!", question: "그럼 싸운 군인들만 다친 거예요?" };
+        const ASK3 = { stage: "ask", mark: "corrected", kind: "meaning", misconception: "none", reaction: "몰랐어요!", question: "피란은 왜 가야 했어요?" };
+        const FIN = (mark) => ({ stage: "finish", mark, thanks: "덕분에 보통 사람들도 다쳤다는 걸 알았어요!", nextQuestion: "사람들은 왜 피란을 떠났을까요?" });
+        const explain = (t) => { q("#explain").value = t; click("보내기"); };
+        await begin(); snap("input");
+        queue("PENDING"); explain(EXPLAIN); await until(() => q(".thinking"), "생각 중"); snap("waiting");
+        await home();
+        await begin(); queue(ASK1); explain(EXPLAIN); await until(asking, "질문 1"); snap("asking-1");
+        queue(ASK2); await answer("마을에서도 싸워서 집이 부서지고 사람들이 다쳤어요."); await until(() => q(".reaction"), "질문 2"); snap("asking-2");
+        queue(ASK3); await answer("아니에요. 피란 가던 보통 사람들도 많이 다쳤어요."); await until(() => asking() && asking().textContent === ASK3.question, "질문 3"); snap("asking-3");
+        queue(FIN("together")); await answer("몰라요."); await until(done, "결과"); snap("result-mixed");
+        await home();
+        await begin(); queue(ASK1, FIN("none")); explain("몰라요"); await until(asking, "질문 1");
+        click("바로 정리하기"); await until(done, "결과"); snap("result-none");
+        await home();
+        await begin(); queue(new Error("연결 실패")); explain(EXPLAIN); await until(() => q(".error-box"), "오류"); snap("error");
+      },
+    };
+    // 모르는 친구를 붙인 뒤 엘렌코스 시작 화면은 정리 방법 목록에 한 줄이 늘어난 것만 달라야 합니다.
+    const ADJUST = {
+      elenchus: { start: (h) => h.replace("엘렌코스 학습정리</option></select>", "엘렌코스 학습정리</option><option value=\"friend\">모르는 친구</option></select>") },
+    };
+
+    try {
+      await SCENES[run]();
+      $("status").textContent = `장면 ${Object.keys(shots).length}개`;
+    } catch (e) {
+      if (e !== "STOP") { $("status").textContent = `실패: ${e && e.message || e}`; return; }
+      $("status").textContent = `${stopAt} 장면에서 멈춤`;
+      return;
+    }
+
+    if (params.has("compare")) {
+      const base = (window.SOK_VIEWS_BASELINE || {})[run];
+      if (!base) { $("status").textContent = "기준값이 없어요"; return; }
+      const names = Object.keys(base);
+      const want = (n) => ((ADJUST[run] || {})[n] || ((h) => h))(base[n]);
+      const diffs = names.filter((n) => want(n) !== shots[n]).map((n) => {
+        const a = want(n), b = shots[n] || "";
+        let i = 0; while (i < a.length && a[i] === b[i]) i++;
+        return `${n} @${i}\n  기준: ${a.slice(Math.max(0, i - 60), i + 120)}\n  지금: ${b.slice(Math.max(0, i - 60), i + 120)}`;
+      });
+      $("status").textContent = `같음 ${names.length - diffs.length}/${names.length}`;
+      $("out").textContent = diffs.join("\n\n");
+    } else {
+      $("out").textContent = JSON.stringify({ [run]: shots });
+    }
+  })();
+  </script>
+</body>
+</html>
