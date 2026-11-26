@@ -193,7 +193,7 @@
     },
   };
 
-  const MODEL_LABEL = { "claude-haiku-5-5": "Claude Haiku 5.5 (기본 · 빠름 · 가장 저렴)", "claude-sonnet-5-5": "Claude Sonnet 5.5 (더 꼼꼼함)", "claude-opus-5-5": "Claude Opus 5.5 (가장 깊게)" };
+  const MODEL_LABEL = L.MODEL_LABEL || { "claude-haiku-5-5": "Claude Haiku 5.5 (기본 · 빠름 · 가장 저렴)", "claude-sonnet-5-5": "Claude Sonnet 5.5 (더 꼼꼼함)", "claude-opus-5-5": "Claude Opus 5.5 (가장 깊게)" };
   const EFFORT_LABEL = { low: "낮음 (빠름)", medium: "보통", high: "높음 (느림)" };
 
   // AI 호출은 부를 때마다 최신 설정을 읽습니다. 수업 중에 키·모델을 바꿔도 학생이 쓴 내용이 남습니다.

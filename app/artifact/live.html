@@ -1,0 +1,93 @@
+<title>엘렌코스 아티팩트 점검</title>
+<!-- 아티팩트판 엘렌코스를 tests/live-cases.js 사례로 실제 AI에 돌리는 교사용 점검 화면.
+     결과는 화면 표와 db(results 모음)에 함께 남겨, 웹앱판 결과와 비교할 수 있게 합니다. -->
+<style>
+  :root { --bg: #f4f6f9; --paper: #fff; --ink: #1f2430; --soft: #5b6270; --line: #dfe3ea; --accent: #1865f2; --ok: #1f7a4d; --warn: #8a5a00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14171d; --paper: #1d212a; --ink: #e8ebf1; --soft: #a3a9b6; --line: #2f3542; --accent: #6ea0ff; --ok: #5fc495; --warn: #e0b45c; color-scheme: dark } }
+  :root[data-theme="dark"] { --bg: #14171d; --paper: #1d212a; --ink: #e8ebf1; --soft: #a3a9b6; --line: #2f3542; --accent: #6ea0ff; --ok: #5fc495; --warn: #e0b45c; color-scheme: dark }
+  body { background: var(--bg); color: var(--ink); font-family: "Noto Sans KR", "Malgun Gothic", sans-serif; padding: 16px; }
+  h1 { font-size: 1.3rem; margin: 0 0 8px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+  button { font: inherit; padding: 10px 22px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  select { font: inherit; padding: 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+  .wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .same { color: var(--ok); font-weight: 700; } .diff { color: var(--warn); font-weight: 700; }
+  #status { color: var(--soft); }
+</style>
+
+<h1>엘렌코스 아티팩트 점검</h1>
+<div class="bar">
+  <label for="model">모델</label>
+  <select id="model"><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
+  <button id="run" type="button">28개 사례 돌리기</button>
+  <span id="status" role="status">준비</span>
+</div>
+<div class="wrap"><table><thead><tr><th>#</th><th>사례</th><th>확인</th><th>방식</th><th>질문</th><th>판정</th><th>기대</th><th>결과</th><th>초</th></tr></thead><tbody id="rows"></tbody></table></div>
+
+<script src="data/units.js"></script>
+<script src="data/topic-3-1.js"></script>
+<script src="data/topic-3-2.js"></script>
+<script src="core/topic.js"></script>
+<script src="core/catalog.js"></script>
+<script src="artifact/llm.js"></script>
+<script src="artifact/elenchus.js"></script>
+<script src="tests/live-cases.js"></script>
+<script>
+(function () {
+  const L = window.SokLLM, E = window.SokElenchus, C = window.SokCatalog;
+  const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
+  const { cases, QUIZ } = window.SokLiveCases;
+  const $ = (id) => document.getElementById(id);
+  let db = null;
+  window.claude && window.claude.use && window.claude.use("db").then((d) => { db = d; }).catch(() => {});
+
+  const td = (t, cls) => { const c = document.createElement("td"); c.textContent = t; if (cls) c.className = cls; return c; };
+  const expectText = (c) => c.expect + (c.expectChecks ? ` (${c.expectChecks.join("/")})` : "") + (c.expectOk ? ` · ${c.expectOk.map((i) => i + 1).join(",")}번 ok` : "");
+
+  async function runCase(c, settings) {
+    const llm = L.createClaudeLLM(settings);
+    let calls = 0, cause = null;
+    const counted = { async call(req) { calls++; try { return await llm.call(req); } catch (e) { cause = String((e && e.message) || e).slice(0, 200); throw e; } } };
+    const t0 = performance.now();
+    const sc = C.resolve(UNITS, TOPICS, { textbookId: c.textbookId, unitId: c.unitId, key: c.key });
+    const s = E.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted });
+    const asked = [], answers = [];
+    let st = await s.submitItems(c.items);
+    let i = 0;
+    while (st.phase === "asking") {
+      asked.push(st.question);
+      if (i < c.answers.length) { answers.push(c.answers[i]); st = await s.submitAnswer(c.answers[i++]); }
+      else { answers.push("[바로 정리하기]"); st = await s.finishNow(); }
+    }
+    const checksOk = (!c.expectChecks || JSON.stringify(st.checks) === JSON.stringify(c.expectChecks))
+      && (!c.expectOk || (st.checks && c.expectOk.every((k) => st.checks[k] === "ok")));
+    const quiz = st.mode === "counter" ? asked.filter((q) => QUIZ.test(q)).length : 0;
+    const same = st.phase === "done" && st.verdict === c.expect && checksOk && st.fallbacks === 0 && quiz === 0;
+    return { name: c.name, checks: st.checks || [], mode: st.mode || "", asked, answers, verdict: st.phase === "error" ? "오류" : (st.verdict || ""),
+      summary: st.summary || [], expect: expectText(c), same, fallbacks: st.fallbacks, quiz, calls, secs: Math.round((performance.now() - t0) / 100) / 10, cause: cause || "" };
+  }
+
+  $("run").addEventListener("click", async () => {
+    $("run").disabled = true;
+    const settings = { model: $("model").value, effort: "low" };
+    $("rows").textContent = "";
+    let sameCount = 0;
+    for (let n = 0; n < cases.length; n++) {
+      $("status").textContent = `${n + 1} / ${cases.length} 돌리는 중 · ${settings.model}`;
+      let r;
+      try { r = await runCase(cases[n], settings); } catch (e) { r = { name: cases[n].name, checks: [], mode: "", asked: [], answers: [], verdict: "오류", summary: [], expect: expectText(cases[n]), same: false, calls: 0, secs: 0, cause: String(e && e.message || e).slice(0, 200) }; }
+      if (r.same) sameCount++;
+      const tr = document.createElement("tr");
+      [String(n + 1), r.name, r.checks.join("/") || "-", r.mode || "-", r.asked.join(" / "), r.verdict, r.expect].forEach((t) => tr.append(td(t)));
+      tr.append(td(r.same ? "같음" : "다름", r.same ? "same" : "diff"), td(String(r.secs)));
+      $("rows").append(tr);
+      if (db) { try { await db.doc(`results/c${String(n).padStart(2, "0")}`).set({ ...r, model: settings.model, at: Date.now() }); } catch (e) { /* 표에는 남습니다 */ } }
+    }
+    $("status").textContent = `끝 · 기대와 같음 ${sameCount} / ${cases.length} · ${settings.model}`;
+    $("run").disabled = false;
+  });
+})();
+</script>

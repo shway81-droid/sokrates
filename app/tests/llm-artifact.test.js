@@ -12,8 +12,10 @@ const schema = {
 test("keyless and same settings shape", () => {
   assert.equal(A.KEYLESS, true);
   const s = A.loadSettings({ getItem: () => null });
-  assert.equal(s.model, "claude-haiku-5-5");
+  assert.equal(s.model, "claude-sonnet-5-5");
   assert.equal(s.effort, "low");
+  assert.match(A.MODEL_LABEL["claude-sonnet-5-5"], /기본/);
+  assert.doesNotMatch(A.MODEL_LABEL["claude-haiku-5-5"], /기본/);
 });
 
 test("system and messages become user turns, system first", () => {

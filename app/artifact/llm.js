@@ -5,7 +5,9 @@
 (function (root) {
   const MODELS = ["claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"];
   const EFFORTS = ["low", "medium", "high"];
-  const DEFAULTS = { model: "claude-haiku-5-5", effort: "low" };
+  // 아티팩트판은 API 요금이 아니라 구독 한도에서 쓰므로 판단이 좋은 Sonnet 을 기본으로 둡니다.
+  const DEFAULTS = { model: "claude-sonnet-5-5", effort: "low" };
+  const MODEL_LABEL = { "claude-sonnet-5-5": "Claude Sonnet 5.5 (기본 · 꼼꼼함)", "claude-opus-5-5": "Claude Opus 5.5 (가장 깊게 · 느림)", "claude-haiku-5-5": "Claude Haiku 5.5 (가장 빠름)" };
   const KEYS = { model: "sok.model", effort: "sok.effort" };
   const TIER = { "claude-haiku-5-5": "quick", "claude-sonnet-5-5": "default", "claude-opus-5-5": "complex" };
 
@@ -101,7 +103,7 @@
     };
   }
 
-  const SokLLM = { KEYLESS: true, MODELS, EFFORTS, DEFAULTS, KEYS, loadSettings, saveSettings, clearKey, buildInput, optionsFor, validate, createClaudeLLM };
+  const SokLLM = { KEYLESS: true, MODEL_LABEL, MODELS, EFFORTS, DEFAULTS, KEYS, loadSettings, saveSettings, clearKey, buildInput, optionsFor, validate, createClaudeLLM };
   if (typeof module !== "undefined" && module.exports) module.exports = SokLLM;
   else root.SokLLM = SokLLM;
 })(this);
