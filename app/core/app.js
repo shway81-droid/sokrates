@@ -126,6 +126,8 @@
   const COMMON = {
     settings() {
       const s = L.loadSettings();
+      // 아티팩트판(KEYLESS)은 화면을 연 사람의 Claude 계정으로 부르므로 키 칸이 없습니다.
+      const keyless = !!L.KEYLESS;
       const key = el("input", { type: "password", id: "api-key", autocomplete: "off", "data-autofocus": true,
         placeholder: s.apiKey ? "저장된 키가 있어요 (바꿀 때만 입력)" : "sk-ant-로 시작하는 키" });
       const model = el("select", { id: "model" }, L.MODELS.map((m) =>
@@ -135,7 +137,7 @@
 
       function save() {
         const typed = key.value.trim();
-        if (!typed && !s.apiKey) { key.focus(); toast("API 키를 넣어 주세요"); return; }
+        if (!keyless && !typed && !s.apiKey) { key.focus(); toast("API 키를 넣어 주세요"); return; }
         L.saveSettings({ apiKey: typed || null, model: model.value, effort: effort.value });
         toast("저장했어요");
         backFromSettings();
@@ -143,15 +145,17 @@
       return el("section", { class: "stack" }, [
         el("h1", { text: "설정" }),
         el("div", { class: "card stack" }, [
-          el("label", { class: "field" }, [el("span", { text: "Claude API 키" }), key,
-            el("div", { class: "hint", text: "키는 이 PC의 브라우저에만 저장돼요. 여러 사람이 쓰는 PC라면 수업 뒤에 [키 지우기]를 눌러 주세요." })]),
+          keyless
+            ? el("div", { class: "hint", text: "이 화면은 지금 로그인한 Claude 계정으로 AI를 불러요. 처음 부를 때 허용 창이 한 번 떠요." })
+            : el("label", { class: "field" }, [el("span", { text: "Claude API 키" }), key,
+              el("div", { class: "hint", text: "키는 이 PC의 브라우저에만 저장돼요. 여러 사람이 쓰는 PC라면 수업 뒤에 [키 지우기]를 눌러 주세요." })]),
           el("label", { class: "field" }, [el("span", { text: "AI 모델" }), model]),
           el("label", { class: "field" }, [el("span", { text: "생각하는 정도" }), effort,
             el("div", { class: "hint", text: "낮을수록 답이 빨라요. 교실에서는 '낮음'을 권해요." })]),
           el("div", { class: "row end" }, [
-            s.apiKey && el("button", { class: "btn quiet", type: "button", text: "키 지우기",
+            !keyless && s.apiKey && el("button", { class: "btn quiet", type: "button", text: "키 지우기",
               onclick: () => { L.clearKey(); toast("키를 지웠어요"); show("settings"); } }),
-            s.apiKey && el("button", { class: "btn secondary", type: "button", text: "닫기", onclick: backFromSettings }),
+            (keyless || s.apiKey) && el("button", { class: "btn secondary", type: "button", text: "닫기", onclick: backFromSettings }),
             el("button", { class: "btn", type: "button", text: "저장", onclick: save }),
           ]),
         ]),
@@ -213,7 +217,7 @@
   function newStudent() {
     if (app.session) app.session.cancel();
     const settings = L.loadSettings();
-    if (!settings.apiKey) { show("settings"); return; }
+    if (!L.KEYLESS && !settings.apiKey) { show("settings"); return; }
     const sc = current();
     app.scope = sc;
     app.session = method().createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: liveLLM,
@@ -251,5 +255,5 @@
   $("bar-home").addEventListener("click", goHome);
 
   root.SokApp = { registerMethod, methods, show };
-  show(L.loadSettings().apiKey ? "start" : "settings");
+  show(L.KEYLESS || L.loadSettings().apiKey ? "start" : "settings");
 })(window);
