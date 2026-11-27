@@ -34,21 +34,24 @@
 
 진행
 1. 확인(stage "check"): 세 항목마다 checks를 정합니다.
-   ok = 자료와 뜻이 맞음 / think = 학생 문장에 [흔한 오개념]의 틀린 생각이 실제로 들어 있거나 자료와 분명히 어긋남(같은 낱말이 나오는 것만으로는 아님) / unsure = 주제와 관계있지만 자료로 확인되지 않음 / outside = 주제와 관계없는 말(장난, 빈말, 모르겠다)
+   ok = 자료와 뜻이 맞음. 자료에 나오는 낱말·이름·일을 짧게 적은 것도 ok("을사늑약", "815", "의병 싸움")
+   think = 학생 문장에 [흔한 오개념]의 틀린 생각이 실제로 들어 있거나 자료와 분명히 어긋남(같은 낱말이 나오는 것만으로는 아님)
+   unsure = 주제와 관계있지만 자료로 확인되지 않거나 너무 막연함("전쟁", "독립")
+   outside = 장난, 빈말, "모르겠다"처럼 주제와 관계없는 말. 수업에 나온 이름·낱말이 들어 있으면 outside가 아님
    그리고 묻을 항목 target(0~2)과 방식 mode를 고르고 첫 질문을 냅니다.
    counter = think 항목에만 씁니다. 학생 말이 맞다면 어떻게 되는지 묻습니다. 오개념의 반례 실마리를 참고합니다.
    retry = think가 없고 outside가 있을 때(unsure가 함께 있어도), 오늘 배운 것을 하나 더 말해 보게 하기
    reason = think와 outside가 없을 때, 학생이 한 말 가운데 까닭이 자료에 나오는 항목의 이유 묻기(학생이 말하지 않은 일의 까닭은 묻지 않음)
    misconception = 고른 항목이 [흔한 오개념] 가운데 하나면 그 id, 아니면 "none". 오늘 차시 오개념을 먼저 보고, 앞 차시 오개념은 학생이 그 내용을 말했을 때만 씁니다.
-2. 문답: 학생 답을 보고 판단이 서면 판정하고, 아니면 다음 질문을 냅니다. 학생이 인정한 것을 처음 말의 내용에 다시 대어 묻되, "처음 한 말은 맞을까요?", "처음 말과 어떻게 다른가요?"처럼 처음 말을 가리키지 말고 내용으로 묻습니다(예: "아직 나뉘어 있다면 1953년에 전쟁이 끝난 것일까요?"). 학생이 되물으면 답하지 말고 스스로 찾게 하는 질문으로 돌려줍니다. "모르겠어요"에는 더 쉬운 질문으로 바꿉니다. 까닭을 대면 그 까닭을 시험해 봅니다.
+2. 문답: 학생 답을 보고 판단이 서면 판정하고, 아니면 다음 질문을 냅니다. 학생이 인정한 것을 처음 말의 내용에 다시 대어 묻되, "처음 한 말은 맞을까요?", "처음 말과 어떻게 다른가요?"처럼 처음 말을 가리키지 말고 내용으로 묻습니다(예: "아직 나뉘어 있다면 1953년에 전쟁이 끝난 것일까요?"). 학생이 되물으면 답하지 말고 스스로 찾게 하는 질문으로 돌려줍니다. "모르겠어요"에는 판정하지 말고 더 쉬운 질문으로 바꿉니다(질문이 남았을 때). 까닭을 대면 그 까닭을 시험해 봅니다.
 3. 판정(stage "verdict")
    strong = 반례에도 자료 근거를 대며 생각을 지켰거나, 학생 답에 자료와 맞는 까닭이 들어 있음
-   revisit = 학생이 스스로 허점을 인정하거나 처음 말을 고쳐 말함
-   hold = 어느 쪽도 아님, 근거 없이 고집함, 또는 주제와 관계있는 말이 끝내 나오지 않음
-   summary 세 칸은 학생에게 보여 주는 글입니다. 칸마다 40자 안쪽 한 문장으로, 마침표 없이 "~다" 또는 "~요"로 끝냅니다. 칸 이름을 앞에 붙이지 않고, "학생이" 같은 3인칭을 쓰지 않습니다. 주제와 관계없는 말(outside 항목, 장난)은 정리에 옮기지 않습니다.
+   revisit = 학생이 처음 생각을 스스로 의심하거나("~가 맞는지 헷갈려요") 고쳐 말함
+   hold = 어느 쪽도 아님, 근거 없이 고집함, 작은 점만 인정하고 "그래도 ~"라며 처음 생각을 다시 내세움, 또는 주제와 관계있는 말이 끝내 나오지 않음
+   summary 세 칸은 학생에게 보여 주는 글입니다. 칸마다 40자 안쪽 한 문장으로, 마침표 없이 "~다" 또는 "~요"로 끝냅니다. 칸 이름을 앞에 붙이지 않고, "학생이" 같은 3인칭이나 "~을 말했어요"처럼 말한 일을 적지 않고 내용 자체를 씁니다. learned와 rethought는 학생이 실제로 한 말 안에서 쓰고 자료의 사실을 보태지 않습니다. 주제와 관계없는 말(outside 항목, 장난)은 말을 바꿔서도 정리에 옮기지 않습니다.
    learned = 학생이 맞게 말한 내용 한두 가지(학생이 하지 않은 말이나 깨닫지 못한 정답을 보태지 않음). 맞게 말한 것이 없으면 "오늘 배운 것을 아직 말하지 못했어요"
    rethought = revisit이면 고친 생각 자체를 사실 문장으로, strong이면 학생이 댄 근거, hold면 학생이 주제에 대해 한 생각을 "~라고 생각했어요"로(그런 말이 없으면 "오늘 배운 것을 다시 떠올려 보기로 했어요")
-   nextQuestion = 다음 시간에 확인할, "요?"로 끝나는 질문 하나
+   nextQuestion = 다음 시간에 생각해 볼, "요?"로 끝나는 질문 하나(보기를 주지 않고, 몇 개·언제 같은 퀴즈보다 까닭을 생각해 볼 질문)
 
 출력은 주어진 JSON 하나만 냅니다. 쓰지 않는 칸은 question "", verdict "none", summary 세 칸 "" 로 둡니다.
 
@@ -130,6 +133,8 @@
   const FIRST_WORDS_Q = /처음(에)?\s?(한\s?)?말/;
   const FORBIDDEN = /틀렸|정답|오답|반례/;
   const SUMMARY_MAX = 45;
+  const DONT_KNOW = /모르|몰라/;
+  const SAID_IT =/(말했|떠올렸|기억했|기억해\s?냈)어요$/;
   const squash = (t) => String(t).replace(/[\s.]/g, "");
 
   function questionProblem(q) {
@@ -143,6 +148,10 @@
   function styleProblem(out, items, checks) {
     if (out.stage === "check") {
       if (out.mode === "counter" && out.checks[out.target] !== "think") return "mode counter는 think 항목에만 씀 — think가 없으면 outside가 있을 때 retry, 없을 때 reason";
+      const has = (c) => out.checks.includes(c);
+      if (out.mode !== "counter" && has("think")) return "think 항목이 있으면 mode는 counter — 그 think 항목을 target으로";
+      if (out.mode === "retry" && !has("outside")) return "mode retry는 outside 항목이 있을 때만 씀 — think와 outside가 없으면 reason";
+      if (out.mode === "reason" && has("outside")) return "outside 항목이 있으면 mode는 retry";
       return questionProblem(out.question);
     }
     if (out.stage === "question") return questionProblem(out.question);
@@ -156,11 +165,23 @@
     for (const [i, t] of lines.slice(0, 2).entries()) {
       if (/\.$/.test(t)) return `summary ${i + 1}번째 칸 끝의 마침표 빼기`;
       if (!/[다요]$/.test(t)) return `summary ${i + 1}번째 칸을 "~다" 또는 "~요"로 끝나는 문장으로 쓰기`;
+      if (SAID_IT.test(t)) return `summary ${i + 1}번째 칸이 "~을 말했어요"처럼 말한 일을 적음 — 배운 내용 자체를 사실 문장으로 쓰기`;
     }
     if (!/요\s*\?$/.test(lines[2])) return 'summary nextQuestion을 "요?"로 끝나는 질문으로 쓰기';
-    const off = (items || []).filter((_, i) => checks && checks[i] === "outside").map(squash).map((t) => t.replace(/다$/, "")).filter((t) => t.length >= 4);
-    if (off.some((t) => lines.some((l) => squash(l).includes(t)))) return "summary에 주제와 관계없는 말(outside 항목)을 옮김 — 정리에서 빼기";
+    // 다음 시간 질문은 복습용이라 "어디에서" 같은 사실 질문은 Opus 도 씁니다. 보기를 주는 질문만 막습니다.
+    if (CHOICE_Q.test(lines[2])) return "summary nextQuestion이 답을 늘어놓고 고르게 함 — 보기 없이 묻기";
+    const off = (items || []).filter((_, i) => checks && checks[i] === "outside");
+    if (off.some((t) => lines.some((l) => copiedFrom(t, l)))) return "summary에 주제와 관계없는 말(outside 항목)을 옮김 — 정리에서 빼기";
     return null;
+  }
+
+  // outside 항목을 정리에 옮겼는지: 통째로 들어 있거나, 조사만 바뀐 채 낱말(2자 이상)이 모두 들어 있으면 옮긴 것으로 봅니다.
+  function copiedFrom(item, line) {
+    const l = squash(line);
+    const whole = squash(item).replace(/다$/, "");
+    if (whole.length >= 4 && l.includes(whole)) return true;
+    const words = String(item).split(/\s+/).map((w) => w.replace(/[.,!?]/g, "").replace(/(은|는|이|가|을|를|에|의|도|로|으로)$/, "")).filter((w) => w.length >= 2);
+    return words.length >= 2 && words.every((w) => l.includes(w));
   }
 
   function initialState() {
@@ -194,7 +215,7 @@
 
     // 모양이 어긋나거나 원칙에 걸리면 까닭을 알려 한 번만 다시 받습니다.
     // 다시 받은 답의 모양이 어긋나면 null(기본값으로 수업을 이어 감), 원칙만 걸리면 그 답을 씁니다.
-    async function ask(task, schema, stages) {
+    async function ask(task, schema, stages, extraProblem = () => null) {
       const gen = generation;
       let content = buildMessage(task);
       for (let attempt = 1; attempt <= 2; attempt++) {
@@ -202,7 +223,7 @@
         if (gen !== generation) throw CANCELLED;
         const problem = shapeProblem(out, stages);
         if (!problem) {
-          const style = styleProblem(out, state.items, state.checks);
+          const style = styleProblem(out, state.items, state.checks) || extraProblem(out);
           if (!style || attempt === 2) return out;
           content = buildMessage(task, `[앞 응답을 고쳐 주세요: ${style}] 이 점만 고쳐 다시 내세요.`);
           continue;
@@ -232,11 +253,19 @@
       state.phase = "asking";
     }
 
+    // 질문이 남았는데 "모르겠어요" 바로 뒤에 hold로 끝내면, 더 쉬운 질문을 내도록 한 번만 다시 받습니다.
+    function earlyHoldProblem(out) {
+      const last = state.turns.at(-1);
+      if (out.stage === "verdict" && out.verdict === "hold" && last && DONT_KNOW.test(last.a))
+        return "학생이 모르겠다고 했고 질문이 남았음 — 판정하지 말고 더 쉬운 질문을 내기";
+      return null;
+    }
+
     async function doNext() {
       const left = state.maxQuestions - state.turns.length;
       const out = await ask(
         `학생의 마지막 답을 보고, 판단이 서면 stage "verdict"로 판정과 세 줄 정리를, 아니면 stage "question"으로 다음 질문 1개를 내세요. 남은 질문은 ${left}번입니다.`,
-        SCHEMAS.next, ["question", "verdict"]);
+        SCHEMAS.next, ["question", "verdict"], earlyHoldProblem);
       if (out && out.stage === "verdict") return applyVerdict(out);
       state.question = out ? out.question.trim() : DEFAULT_QUESTION;
       state.phase = "asking";
@@ -292,7 +321,7 @@
     };
   }
 
-  const SokElenchus = { id: "elenchus", name: "엘렌코스 학습정리", SYSTEM_PROMPT, SCHEMAS, ERROR_MESSAGE, createSession };
+  const SokElenchus = { id: "elenchus", name: "엘렌코스 학습정리", SYSTEM_PROMPT, SCHEMAS, ERROR_MESSAGE, createSession, lint: { questionProblem, styleProblem } };
   if (isNode) module.exports = SokElenchus;
   else root.SokElenchus = SokElenchus;
 })(this);

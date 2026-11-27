@@ -215,3 +215,80 @@ test("prompt spells out the new principles", () => {
   assert.match(E.SYSTEM_PROMPT, /관계없는 말.*옮기지/);
   assert.doesNotMatch(E.SYSTEM_PROMPT, /learned "북한의 남침과 국제 연합군의 참전"/);
 });
+
+test("mode must follow the checks: retry needs an outside item, reason needs no think or outside", async () => {
+  const cases = [
+    [{ ...CHECK, checks: ["ok", "unsure", "ok"], target: 1, mode: "retry", question: "오늘 배운 것을 하나 더 말해 볼까요?" }, /retry/],
+    [{ ...CHECK, checks: ["ok", "think", "ok"], target: 0, mode: "reason", question: "왜 그렇게 되었을까요?" }, /think/],
+    [{ ...CHECK, checks: ["ok", "outside", "ok"], target: 0, mode: "reason", question: "왜 그렇게 되었을까요?" }, /outside/],
+  ];
+  for (const [bad, re] of cases) {
+    const { fake, s } = make([bad, CHECK]);
+    const st = await s.submitItems(three);
+    askedAgain(fake, re);
+    assert.equal(st.mode, "counter");
+  }
+});
+
+test("summary states what was learned, not that the student said it", async () => {
+  const told = { ...SUM, learned: "윤봉길이 폭탄을 던졌다는 것을 말했어요" };
+  const { fake, s } = make([CHECK, V("revisit", told), V("revisit")]);
+  await s.submitItems(three);
+  const st = await s.submitAnswer("아 멈춘 거네요");
+  askedAgain({ calls: fake.calls.slice(1) }, /말했/);
+  assert.equal(st.summary[0], SUM.learned);
+});
+
+test("the fallback learned line is not treated as 'said it' wording", () => {
+  const out = V("hold", { learned: "오늘 배운 것을 아직 말하지 못했어요", rethought: "오늘 배운 것을 다시 떠올려 보기로 했어요", nextQuestion: "만세 시위는 어떻게 퍼졌을까요?" });
+  assert.equal(E.lint.styleProblem(out, three, ["ok", "ok", "ok"]), null);
+});
+
+test("a hold right after 'I don't know' while questions remain is asked again once for an easier question", async () => {
+  const { fake, s } = make([CHECK, V("hold"), Q("싸움을 멈춘 것과 끝낸 것은 같을까요?")]);
+  await s.submitItems(three);
+  const st = await s.submitAnswer("잘 모르겠어요");
+  askedAgain({ calls: fake.calls.slice(1) }, /쉬운 질문/);
+  assert.equal(st.phase, "asking");
+  assert.equal(st.question, "싸움을 멈춘 것과 끝낸 것은 같을까요?");
+});
+
+test("a revisit right after a shaky answer is kept, and the last answer may end in hold", async () => {
+  const a = make([CHECK, V("revisit")]);
+  await a.s.submitItems(three);
+  assert.equal((await a.s.submitAnswer("아 멈춘 거네요, 잘 모르겠지만요")).verdict, "revisit");
+  assert.equal(a.fake.calls.length, 2);
+  const b = make([CHECK, Q("q2?"), Q("q3?"), V("hold")]);
+  await b.s.submitItems(three);
+  await b.s.submitAnswer("1"); await b.s.submitAnswer("2");
+  assert.equal((await b.s.submitAnswer("몰라요")).verdict, "hold");
+  assert.equal(b.fake.calls.length, 4);
+});
+
+test("prompt: a short keyword from the lesson is ok, a lesson name is never outside, and 'still' keeps hold", () => {
+  assert.match(E.SYSTEM_PROMPT, /짧게 적은 것.*ok/);
+  assert.match(E.SYSTEM_PROMPT, /outside가 아님/);
+  assert.match(E.SYSTEM_PROMPT, /그래도/);
+  assert.match(E.SYSTEM_PROMPT, /말했어요/);
+  assert.ok(E.SYSTEM_PROMPT.length < 3400, `프롬프트가 ${E.SYSTEM_PROMPT.length}자`);
+});
+
+test("an off-topic item is caught in the summary even when a particle changed", () => {
+  const joke = ["선생님이 칼 차면 멋있다", "총독부는 게임에 나오는 성", "몰라요"];
+  const checks = ["outside", "outside", "outside"];
+  const copied = V("hold", { learned: "오늘 배운 것을 아직 말하지 못했어요", rethought: "총독부가 게임에 나오는 성이라고 생각했어요", nextQuestion: "조선 총독부는 어떤 일을 했을까요?" });
+  assert.match(E.lint.styleProblem(copied, joke, checks), /관계없는/);
+  const fine = V("revisit", { learned: "옛날에는 선생님이 칼을 차고 있었다", rethought: "칼을 찬 선생님 앞에서 공부하는 것은 무서운 일이었다", nextQuestion: "일제는 왜 선생님에게 칼을 차게 했을까요?" });
+  assert.equal(E.lint.styleProblem(fine, joke, checks), null);
+});
+
+test("the next-time question may ask a fact for review but never gives choices", () => {
+  const lint = (nq) => E.lint.styleProblem(V("revisit", { ...SUM, nextQuestion: nq }), three, ["ok", "ok", "think"]);
+  assert.match(lint("정전일까요, 종전일까요?"), /고르게/);
+  assert.equal(lint("피란 간 학생들은 어디에서 공부했을까요?"), null);
+});
+
+test("prompt: the summary adds no facts the student did not say", () => {
+  assert.match(E.SYSTEM_PROMPT, /보태지 않/);
+  assert.match(E.SYSTEM_PROMPT, /nextQuestion[^\n]*퀴즈/);
+});

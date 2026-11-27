@@ -1,0 +1,149 @@
+<title>엘렌코스 모델 비교</title>
+<!-- 가상 학생 100명(tests/sim-students.js)을 아티팩트판 엘렌코스로 돌려 모델끼리 처리 과정을 견주는 교사용 화면.
+     학생 답은 학생 역할 AI(늘 Sonnet)가 설정표대로 만듭니다. 결과는 db의 cmp_<회차>_<모델> 모음에 학생마다 남고,
+     이미 남은 학생은 건너뛰므로 끊겨도 같은 회차로 다시 누르면 이어서 돕니다. -->
+<style>
+  :root { --bg: #f4f6f9; --paper: #fff; --ink: #1f2430; --soft: #5b6270; --line: #dfe3ea; --accent: #1865f2; --ok: #1f7a4d; --warn: #8a5a00; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #14171d; --paper: #1d212a; --ink: #e8ebf1; --soft: #a3a9b6; --line: #2f3542; --accent: #6ea0ff; --ok: #5fc495; --warn: #e0b45c; color-scheme: dark } }
+  :root[data-theme="dark"] { --bg: #14171d; --paper: #1d212a; --ink: #e8ebf1; --soft: #a3a9b6; --line: #2f3542; --accent: #6ea0ff; --ok: #5fc495; --warn: #e0b45c; color-scheme: dark }
+  body { background: var(--bg); color: var(--ink); font-family: "Noto Sans KR", "Malgun Gothic", sans-serif; padding: 16px; }
+  h1 { font-size: 1.3rem; margin: 0 0 8px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+  button { font: inherit; padding: 10px 22px; border-radius: 10px; border: 0; background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+  select { font: inherit; padding: 8px; background: var(--paper); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; }
+  .wrap { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+  th, td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; vertical-align: top; }
+  .err { color: var(--warn); font-weight: 700; }
+  #status { color: var(--soft); }
+</style>
+
+<h1>엘렌코스 모델 비교</h1>
+<div class="bar">
+  <label for="model">엘렌코스 모델</label>
+  <select id="model"><option value="claude-opus-5-5">Opus 5.5</option><option value="claude-sonnet-5-5">Sonnet 5.5</option><option value="claude-haiku-5-5">Haiku 5.5</option></select>
+  <label for="tag">회차</label>
+  <select id="tag"><option>v1</option><option>v2</option><option>v3</option><option>v4</option><option>v5</option></select>
+  <label for="set">학생</label>
+  <select id="set"><option value="all">100명 모두</option><option value="tune">고칠 때 보는 70명</option><option value="check">확인용 30명</option></select>
+  <button id="run" type="button">돌리기</button>
+  <button id="stop" type="button" class="ghost" disabled>멈추기</button>
+  <span id="status" role="status">준비</span>
+</div>
+<div class="wrap"><table><thead><tr><th>학생</th><th>수준</th><th>확인</th><th>방식</th><th>질문 수</th><th>판정</th><th>초</th><th>비고</th></tr></thead><tbody id="rows"></tbody></table></div>
+
+<script src="data/units.js"></script>
+<script src="data/topic-3-1.js"></script>
+<script src="data/topic-3-2.js"></script>
+<script src="core/topic.js"></script>
+<script src="core/catalog.js"></script>
+<script src="artifact/llm.js"></script>
+<script src="artifact/elenchus.js"></script>
+<script src="tests/sim-students.js"></script>
+<script src="tests/sim-student.js"></script>
+<script>
+(function () {
+  const L = window.SokLLM, E = window.SokElenchus, C = window.SokCatalog, P = window.SokSimStudent;
+  const TOPICS = window.SOKRATES_TOPICS, UNITS = window.SOKRATES_UNITS;
+  const { students } = window.SokSimStudents;
+  const STUDENT_OPTS = { model: "claude-sonnet-5-5", modelTier: "default", effort: "low", cache: false };
+  const SHORT = { "claude-opus-5-5": "opus", "claude-sonnet-5-5": "sonnet", "claude-haiku-5-5": "haiku" };
+  const $ = (id) => document.getElementById(id);
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  let db = null, sample = null, stopping = false;
+  if (window.claude && window.claude.use) {
+    window.claude.use("db").then((d) => { db = d; }).catch(() => {});
+    window.claude.use("sample").then((s) => { sample = s; }).catch(() => {});
+  }
+
+  const td = (t, cls) => { const c = document.createElement("td"); c.textContent = t; if (cls) c.className = cls; return c; };
+  function addRow(r) {
+    const tr = document.createElement("tr");
+    [r.id, r.level, (r.checks || []).join("/") || "-", r.mode || "-", String((r.turns || []).length), r.verdict || "-", String(r.secs)].forEach((t) => tr.append(td(t)));
+    tr.append(td(r.error || (r.fallbacks ? `기본값 ${r.fallbacks}번` : ""), r.error ? "err" : ""));
+    $("rows").prepend(tr);
+  }
+
+  async function studentSays(st, turns, question) {
+    for (let i = 0; i < 3; i++) {
+      try { return P.cleanAnswer((await sample(P.studentPrompt(st, turns, question), STUDENT_OPTS)).text); }
+      catch (e) { if (e && e.code === "rate_limited") { await sleep(30000); continue; } throw e; }
+    }
+    throw new Error("학생 역할 AI가 답하지 못함");
+  }
+
+  async function runStudent(st, model) {
+    const llm = L.createClaudeLLM({ model, effort: "low" });
+    let calls = 0, studentCalls = 0;
+    const counted = { async call(req) { calls++; return llm.call(req); } };
+    const t0 = performance.now();
+    const sc = C.resolve(UNITS, TOPICS, { textbookId: st.textbookId, unitId: st.unitId, key: st.key });
+    const s = E.createSession({ topic: sc.topic, textbookId: sc.textbookId, lessonId: sc.choice.lessonId, llm: counted });
+    let state = await s.submitItems(st.items);
+    const turns = [];
+    for (let guard = 0; guard < 8; guard++) {
+      if (state.phase === "error") {
+        if (guard >= 3) break;
+        await sleep(20000);
+        state = await s.retry();
+        continue;
+      }
+      if (state.phase !== "asking") break;
+      const a = await studentSays(st, turns, state.question);
+      studentCalls++;
+      turns.push({ q: state.question, a });
+      state = await s.submitAnswer(a);
+    }
+    return {
+      id: st.id, level: st.level, split: st.split, textbookId: st.textbookId, key: st.key, items: st.items, miss: st.miss,
+      model, checks: state.checks || [], target: state.target, mode: state.mode || "", misconception: state.misconception,
+      turns, verdict: state.phase === "done" ? state.verdict : "", summary: state.summary || [],
+      fallbacks: state.fallbacks || 0, calls, studentCalls, secs: Math.round((performance.now() - t0) / 100) / 10,
+      error: state.phase === "error" ? "엘렌코스 오류" : "",
+    };
+  }
+
+  $("stop").addEventListener("click", () => { stopping = true; $("stop").disabled = true; $("status").textContent = "이번 학생까지 하고 멈춥니다"; });
+
+  $("run").addEventListener("click", async () => {
+    if (!db || !sample) { $("status").textContent = "db 또는 Claude 사용 권한이 아직 없습니다. 잠시 뒤 다시 눌러 주세요."; return; }
+    const model = $("model").value, tag = $("tag").value, set = $("set").value;
+    const coll = `cmp_${tag}_${SHORT[model]}`;
+    const list = students.filter((s) => set === "all" || s.split === set);
+    $("run").disabled = true; $("stop").disabled = false; stopping = false;
+    $("rows").textContent = "";
+    // sample.json 은 실제로 답한 모델을 알려 주지 않으므로, 돌리기 전에 한 번 물어 기록합니다.
+    let answeredBy = "";
+    try {
+      const probe = await sample("'네' 한 글자로만 답하세요.", L.optionsFor({ model, effort: "low" }));
+      answeredBy = probe.modelApplied || `요청 모델 대신 ${probe.modelTierApplied} 등급`;
+    } catch (e) { answeredBy = `확인 못 함(${(e && e.code) || "오류"})`; }
+    let done = 0, skipped = 0, failed = 0;
+    for (const st of list) {
+      if (stopping) break;
+      const ref = db.doc(`${coll}/${st.id}`);
+      try { const snap = await ref.get(); if (snap && snap.exists && !(snap.data() || {}).error) { skipped++; continue; } } catch (e) { /* 없으면 돌립니다 */ }
+      let r;
+      // 사용량 제한(rate_limited)으로 오류가 나면 5분 쉬고 같은 학생을 다시 돌립니다(최대 12번, 1시간).
+      for (let tries = 0; ; tries++) {
+        $("status").textContent = `${st.id} 돌리는 중 · ${coll} · 답한 모델 ${answeredBy} · 끝 ${done} · 건너뜀 ${skipped} · 오류 ${failed}`;
+        try { r = await runStudent(st, model); }
+        catch (e) { r = { id: st.id, level: st.level, split: st.split, model, turns: [], secs: 0, error: String((e && e.message) || e).slice(0, 160) }; }
+        if (!r.error || stopping || tries >= 12) break;
+        for (let left = 300; left > 0 && !stopping; left -= 5) {
+          $("status").textContent = `${st.id} 오류 — 사용량 제한으로 보여 쉬는 중(${left}초 뒤 다시, ${tries + 1}번째) · 끝 ${done}`;
+          await sleep(5000);
+        }
+      }
+      if (r.error) failed++; else done++;
+      await sleep(3000); // 학생 사이에 잠깐 쉬어 호출이 몰리지 않게 합니다.
+      addRow(r);
+      try { await ref.set({ ...r, tag, answeredBy, at: Date.now() }); } catch (e) { /* 표에는 남습니다 */ }
+    }
+    $("status").textContent = `${stopping ? "멈춤" : "끝"} · ${coll} · 답한 모델 ${answeredBy} · 새로 ${done} · 건너뜀 ${skipped} · 오류 ${failed}`;
+    $("run").disabled = false; $("stop").disabled = true;
+  });
+})();
+</script>
